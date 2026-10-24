@@ -1,0 +1,11 @@
+.env
+.env.*.local
+/storage/database/*.sqlite
+/storage/database/*.sqlite-wal
+/storage/database/*.sqlite-shm
+*.db
+/storage/logs/*.log
+/public/uploads/*
+!/public/uploads/.gitkeep
+/vendor/
+.DS_Store
