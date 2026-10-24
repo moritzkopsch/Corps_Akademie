@@ -117,7 +117,7 @@ final class AuthenticationTest extends Fixture
         self::assertStringNotContainsString('<script>alert(1)</script>',$response->getContent());
         self::assertStringContainsString("frame-ancestors 'none'",$response->headers->get('Content-Security-Policy'));
         self::assertStringContainsString('no-store',$response->headers->get('Cache-Control'));
-        self::assertSame('no-referrer',$response->headers->get('Referrer-Policy'));
+        self::assertSame('same-origin',$response->headers->get('Referrer-Policy'));
         self::assertSame(404,$this->request('GET','/.env')->getStatusCode());
         self::assertSame(400,$this->request('GET','/',[],['HTTP_HOST'=>'attacker.example'])->getStatusCode());
     }

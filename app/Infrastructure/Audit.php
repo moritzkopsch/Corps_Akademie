@@ -8,10 +8,10 @@ final class Audit
 {
     public function __construct(private readonly Database $db, private readonly ClockInterface $clock) {}
 
-    public function record(string $action, ?int $actor, string $publicId = '', array $details = []): void
+    public function record(string $action, ?int $actor, string $publicId = '', array $details = [], string $entityType = 'user'): void
     {
         $this->db->run('INSERT INTO audit_logs(actor_user_id,action,entity_type,entity_public_id,changes_redacted,correlation_id,occurred_at) VALUES(?,?,?,?,?,?,?)', [
-            $actor, $action, 'user', $publicId, json_encode($details, JSON_THROW_ON_ERROR), bin2hex(random_bytes(12)), $this->clock->now()->getTimestamp(),
+            $actor, $action, $entityType, $publicId, json_encode($details, JSON_THROW_ON_ERROR), bin2hex(random_bytes(12)), $this->clock->now()->getTimestamp(),
         ]);
     }
 

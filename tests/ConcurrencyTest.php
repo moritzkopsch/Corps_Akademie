@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace Corpsakademie\Tests;
 
 use Corpsakademie\Tests\Support\Fixture;
+use Corpsakademie\Infrastructure\Crypto;
 use OTPHP\TOTP;
 
 final class ConcurrencyTest extends Fixture
@@ -17,6 +18,7 @@ $c=new \Corpsakademie\Container(new \Corpsakademie\Infrastructure\Config($argv[1
 try {
     $won=$c->db->immediate(function() use ($c,$job): bool {
         if ($job['mode']==='token') { $c->tokens->consume('bootstrap',$job['token']); $won=true; }
+        elseif ($job['mode']==='public') { $c->publicRequests->confirmInquiry($job['token'],'127.0.0.1'); $won=true; }
         else { $won=$c->mfa->verify($job['user_id'],$job['code']); }
         usleep(100000);
         return $won;
@@ -58,5 +60,14 @@ CHILD;
         $this->c->mfa->enroll((int)$user['id'],$secret,TOTP::createFromSecret($secret,$this->clock)->now());
         $this->clock->advance(30);
         self::assertSame(['lost','won'],$this->compete(['mode'=>'mfa','user_id'=>(int)$user['id'],'code'=>TOTP::createFromSecret($secret,$this->clock)->now()]));
+    }
+
+    public function testConcurrentGuestConfirmationsActivateOnlyOnce(): void
+    {
+        $this->c->publicRequests->submit(['submission'=>Crypto::token(),'name'=>'Testgast','email'=>'gast@example.test','corps'=>'Testcorps','role'=>'','phone'=>'','message'=>'Nur ein Parallelitätstest.','consent'=>'1'],'contact','127.0.0.1');
+        $this->c->publicMail->work();
+        self::assertSame(['lost','won'],$this->compete(['mode'=>'public','token'=>$this->deliveredToken()]));
+        self::assertSame(1,(int)$this->c->db->run("SELECT COUNT(*) FROM public_inquiries WHERE state='received'")->fetchColumn());
+        self::assertSame(2,(int)$this->c->db->run('SELECT COUNT(*) FROM public_mail_outbox')->fetchColumn());
     }
 }

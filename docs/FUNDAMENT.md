@@ -106,3 +106,8 @@ Die automatisierte Suite umfasst frische und wiederholte Migration, Prüfsummen�
 Zusätzlich prüft `scripts/check-live.php` bei laufender lokaler Umgebung den echten HTTP-Zugriffsschutz und die Kette aus fachlicher Outbox, Symfony Mailer, SMTP und Mailpit. Die Testdatenbank ist temporär und wird entfernt. Eine dabei im Mailpit sichtbare Testnachricht betrifft diese wegwerfbare Testdatenbank und keinen echten Benutzer der lokalen Anwendung.
 
 Der bisherige Nachweis gilt für die geprüfte Mac-Umgebung. Linux-Testserver, echtes Kundenhosting, Produktiv-Maildienst, Lastziele, Geschäftsregeln und die übrigen Fachmodule bleiben offen. Vor der nächsten produktiven Stufe wird die Neuinstallation unter Linux wiederholt. Dieses Modul ist keine behauptete Fertigstellung der Gesamtplattform.
+
+
+## Ergänzung: öffentliche Website
+
+Der öffentliche Ausbau ist inzwischen implementiert. Aktueller Funktionsstand, zusätzliche Datenbanktabellen, Rechte, Gastanfragen und Newsletter-Anmeldung sind in [WEBSITE.md](WEBSITE.md) dokumentiert. Frühere Aussagen in diesem Dokument zum noch nicht vorhandenen öffentlichen Bereich beschreiben den damaligen Fundamentstand.

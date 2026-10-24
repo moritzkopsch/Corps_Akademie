@@ -1,6 +1,6 @@
 # Corpsakademie 2.0
 
-Individuelle Seminarplattform mit PHP und SQLite. Aktueller Implementierungsstand: ausführbares Fundament und Identitätsmodul. Seminarverwaltung, Referentenkalender, Buchungskoordination, Angebote und Newsletter folgen in den freigegebenen Entwicklungspaketen.
+Individuelle Seminarplattform mit PHP und SQLite. Aktueller Implementierungsstand: sicheres Identitätsmodul, öffentliche Website, Seminar- und Referentenverwaltung, verifizierte Gastanfragen und Newsletter-Anmeldung mit Double-Opt-in. Referentenkalender, automatische Buchungskoordination, Angebote und Newsletter-Kampagnen folgen in weiteren Modulen.
 
 ## Lokal starten
 
@@ -10,6 +10,9 @@ Voraussetzungen: korrigiertes PHP 8.4 ab 8.4.27 oder PHP 8.5 ab 8.5.12, Composer
 bash scripts/composer install
 php bin/console install
 php bin/console doctor
+
+# Präsentationsinhalte ausschließlich lokal ergänzen:
+php bin/console content:seed
 ```
 
 Der Installer erzeugt eine private `.env` mit zufälligem Anwendungsschlüssel sowie die SQLite-Datenbank außerhalb des Webroots. Er legt kein Konto mit Standardzugangsdaten an. Bestehende Konfiguration und Daten werden bei wiederholter Installation nicht ersetzt.
@@ -28,6 +31,12 @@ php -S 127.0.0.1:8080 -t public public/router.php
 ```
 
 Anwendung: http://127.0.0.1:8080 · Testpostfach: http://127.0.0.1:8025. Jeder Prozess kann im zugehörigen Terminal mit Ctrl+C beendet und mit demselben Befehl neu gestartet werden.
+
+## Öffentliche Website präsentieren
+
+Startseite, Seminare, Referenten, Über uns, Terminplanung, FAQ und Kontakt sind ohne Anmeldung erreichbar. Der dreistufige Anfrageassistent speichert echte Anfragen und fordert eine E-Mail-Bestätigung an. Erst bestätigte Anfragen erscheinen unter `/admin/anfragen`. Die Präsentation verwendet Testadressen mit `@example.test`; Termine, Preise und rechtliche Inhalte benötigen vor Veröffentlichung eine Freigabe.
+
+Ablauf, Quellen und genaue Produktgrenzen: [Öffentliche Website und Kundenpräsentation](docs/WEBSITE.md).
 
 ## Erstes Administratorkonto
 
@@ -66,6 +75,8 @@ Der spätere Kundenbetrieb verlangt eine geprüfte Serverinstallation mit HTTPS 
 
 ## Dokumentation
 
+- [Öffentliche Website und Präsentationsablauf](docs/WEBSITE.md)
+- [Bildmotiv und Generierungsprompt](docs/BILDQUELLEN.md)
 - [Architektur und offene Geschäftsentscheidungen](docs/ARCHITEKTUR.md)
 - [Machbarkeitsanalyse](docs/MACHBARKEIT.md)
 - [Lokale Werkzeuge und SMTP-Postfach](docs/LOKALE_ENTWICKLUNG.md)

@@ -40,11 +40,12 @@ final class Application
             if (!in_array($request->getHost(),$hosts,true)) { return $this->headers($this->error(400,'Ungültiger Aufruf','Diese Adresse ist für die Anwendung nicht freigegeben.')); }
             if ($this->c->config->secureCookies() && !$request->isSecure()) { return $this->headers($this->error(400,'Sichere Verbindung erforderlich','Bitte verwende die HTTPS-Adresse der Anwendung.')); }
             $path = $request->getPathInfo();
-            if (!isset(self::ROUTES[$path])) { return $this->headers($this->error(404,'Seite nicht gefunden','Die gewünschte Seite ist nicht verfügbar.')); }
+            $methods = self::ROUTES[$path] ?? PublicWebsite::methods($path);
+            if ($methods === null) { return $this->headers($this->error(404,'Seite nicht gefunden','Die gewünschte Seite ist nicht verfügbar.')); }
             $method = $request->getMethod();
-            if (!in_array($method,self::ROUTES[$path],true)) {
+            if (!in_array($method,$methods,true)) {
                 $response = $this->error(405,'Aufruf nicht möglich','Diese Aktion ist mit diesem Aufruf nicht verfügbar.');
-                $response->headers->set('Allow',implode(', ',self::ROUTES[$path]));
+                $response->headers->set('Allow',implode(', ',$methods));
                 return $this->headers($response);
             }
             if ((int)$request->headers->get('Content-Length','0')>32768) { return $this->headers($this->error(413,'Eingabe zu groß','Bitte kürze deine Eingaben.')); }
@@ -85,7 +86,9 @@ final class Application
         $user = $session->userId === null ? null : $this->c->accounts->find($session->userId);
         $values = ['email'=>$this->input($request,'email'),'name'=>$this->input($request,'name'),'token'=>$this->input($request,'token')];
         try {
-            if ($path === '/') { return $this->view('home.twig',$session); }
+            $website = new PublicWebsite($this->c,$this->view(...));
+            $public = $website->public($request,$session,$ip);
+            if ($public !== null) { return $public; }
             if ($path === '/abmelden') {
                 if ($session->userId !== null) { $this->c->audit->record('session.logout',$session->userId); }
                 $session = $this->c->sessions->rotate($session,null);
@@ -179,6 +182,8 @@ final class Application
                 return $this->form('mfa',$session,$values);
             }
             if (!$this->isAuthenticated($session)) { return new RedirectResponse($this->destination($session),303); }
+            $content = $website->admin($request,$session,$user);
+            if ($content !== null) { return $content; }
             if ($path === '/sicherheit/wiederherstellung') {
                 $codes = $session->take('recovery_codes');
                 if (!is_array($codes)) { return new RedirectResponse('/konto',303); }
@@ -281,7 +286,9 @@ final class Application
     {
         $response->headers->set('Cache-Control','no-store, private');
         $response->headers->set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
-        $response->headers->set('Referrer-Policy','no-referrer');
+        // no-referrer makes browsers send Origin:null on ordinary form POSTs.
+        // same-origin preserves the Origin check and sends no referrer externally.
+        $response->headers->set('Referrer-Policy','same-origin');
         $response->headers->set('X-Content-Type-Options','nosniff');
         $response->headers->set('X-Frame-Options','DENY');
         $response->headers->set('Permissions-Policy','camera=(), microphone=(), geolocation=()');

@@ -724,3 +724,8 @@ Für die nächste fachliche Antwort genügen zunächst die Architekturfreigabe, 
 | 12 Priorisierte Entwicklung | Abschnitt 12 |
 | 13 Technische Risiken | Abschnitt 13 |
 | 14 Offene Entscheidungen | Abschnitt 14 |
+
+
+## Implementierungsstand: öffentliche Website
+
+Der Ausbau nach den freigegebenen PowerPoint-Mockups ergänzt öffentliche Seiten, persistente Seminar- und Referenteninhalte, verifizierte Gastanfragen und Newsletter-Double-Opt-in. Die Kundenvorführung und Abgrenzung zur noch ausstehenden automatischen Buchungs-Engine sind in [WEBSITE.md](WEBSITE.md) beschrieben. Preise und echte Verfügbarkeiten werden nicht erfunden.

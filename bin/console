@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Corpsakademie\Container;
-use Corpsakademie\Infrastructure\{Config,Installer,Migrator};
+use Corpsakademie\Infrastructure\{CatalogSeeder,Config,Installer,Migrator};
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\{InputArgument,InputInterface,InputOption};
@@ -34,6 +34,12 @@ $console->add((new Command('db:migrate'))->setDescription('Geprüfte Migrationen
 $console->add((new Command('setup:link'))->setDescription('Einmaligen, 30 Minuten gültigen Link für das erste Konto ausgeben.')
     ->setCode(static function(InputInterface $input,OutputInterface $output) use ($container): int {
         $output->writeln($container()->links->setupLink()); return 0;
+    }));
+$console->add((new Command('content:seed'))->setDescription('Lokale Präsentationsinhalte einmalig ergänzen; bestehende Inhalte bleiben erhalten.')
+    ->setCode(static function(InputInterface $input,OutputInterface $output) use ($container,$root): int {
+        $c=$container();
+        $output->writeln(json_encode(CatalogSeeder::seed($c->db,$c->catalog,$root,$c->clock->now()->getTimestamp()),JSON_THROW_ON_ERROR));
+        return 0;
     }));
 $console->add((new Command('user:create'))->setDescription('Konto mit verdeckter Passworteingabe und anschließender E-Mail-Bestätigung anlegen.')
     ->addArgument('email',InputArgument::REQUIRED,'E-Mail-Adresse; lokal @example.test verwenden.')
@@ -66,7 +72,10 @@ $console->add((new Command('mail:work'))->setDescription('Begrenzten Stapel Iden
     ->setCode(static function(InputInterface $input,OutputInterface $output) use ($container): int {
         $limit=filter_var($input->getOption('limit'),FILTER_VALIDATE_INT);
         if ($limit===false || $limit<1 || $limit>100) { throw new RuntimeException('Limit muss zwischen 1 und 100 liegen.'); }
-        $result=$container()->mail->work($limit);
+        $c=$container();
+        $result=$c->mail->work($limit);
+        $remaining=$limit-array_sum($result);
+        if ($remaining>0) { foreach ($c->publicMail->work($remaining) as $key=>$count) { $result[$key]+=$count; } }
         $output->writeln(json_encode($result,JSON_THROW_ON_ERROR)); return $result['ambiguous']>0?1:0;
     }));
 $console->add((new Command('db:backup'))->setDescription('Konsistente lokale Datenbanksicherung außerhalb des Webroots erstellen.')
@@ -84,6 +93,7 @@ $console->add((new Command('mail:watch'))->setDescription('Lokalen Entwicklungsw
         $output->writeln('Lokaler Mailworker läuft. Stoppen mit Ctrl+C.');
         while (true) {
             $result=$c->mail->work();
+            foreach ($c->publicMail->work() as $key=>$count) { $result[$key]+=$count; }
             if (array_sum($result)>0) { $output->writeln(json_encode($result,JSON_THROW_ON_ERROR)); }
             sleep(2);
         }

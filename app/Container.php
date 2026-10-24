@@ -2,10 +2,10 @@
 declare(strict_types=1);
 namespace Corpsakademie;
 
-use Corpsakademie\Application\AccountLinks;
+use Corpsakademie\Application\{AccountLinks,Catalog,PublicRequests};
 use Corpsakademie\Domain\Identity\{Accounts,Authentication,Mfa,RateLimiter,Tokens};
 use Corpsakademie\Http\SessionStore;
-use Corpsakademie\Infrastructure\{Audit,Config,Crypto,Database,IdentityRepository,MailOutbox,SystemClock};
+use Corpsakademie\Infrastructure\{Audit,CatalogRepository,Config,Crypto,Database,IdentityRepository,InquiryRepository,MailOutbox,PublicMailOutbox,SystemClock};
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Mailer\{Mailer,MailerInterface,Transport};
 use Symfony\Component\Mailer\Transport\Smtp\SmtpTransport;
@@ -25,6 +25,10 @@ final class Container
     public readonly Authentication $auth;
     public readonly MailOutbox $mail;
     public readonly AccountLinks $links;
+    public readonly CatalogRepository $catalog;
+    public readonly Catalog $content;
+    public readonly PublicMailOutbox $publicMail;
+    public readonly PublicRequests $publicRequests;
 
     public function __construct(public readonly Config $config, ?ClockInterface $clock = null, ?MailerInterface $mailer = null)
     {
@@ -46,5 +50,9 @@ final class Container
         }
         $this->mail = new MailOutbox($this->db,$config,$this->crypto,$this->clock,$mailer);
         $this->links = new AccountLinks($this->db,$this->accounts,$this->tokens,$this->mail,$this->limits,$this->audit,$config,$this->clock,$this->identity);
+        $this->catalog = new CatalogRepository($this->db);
+        $this->content = new Catalog($this->db,$this->catalog,$this->accounts,$this->audit,$this->clock);
+        $this->publicMail = new PublicMailOutbox($this->db,$config,$this->crypto,$this->clock,$mailer);
+        $this->publicRequests = new PublicRequests($this->db,$this->catalog,new InquiryRepository($this->db),$this->publicMail,$this->crypto,$config,$this->limits,$this->accounts,$this->audit,$this->clock);
     }
 }

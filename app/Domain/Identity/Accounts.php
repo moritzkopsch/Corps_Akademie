@@ -60,6 +60,7 @@ final class Accounts
     public function requiresMfa(int $id): bool
     {
         return $this->can($id,'admin.access') || $this->can($id,'users.view') || $this->can($id,'users.manage')
+            || $this->can($id,'content.manage') || $this->can($id,'inquiries.manage')
             || $this->store->hasAdministrativeRole($id);
     }
 

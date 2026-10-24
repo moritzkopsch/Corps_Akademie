@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+{% if is_local %}<meta name="robots" content="noindex, nofollow">{% endif %}
+<meta name="description" content="{{ meta_description }}">
+<title>{% block title %}Bildung, die verbindet{% endblock %} · Corpsakademie</title>
+<link rel="icon" href="/assets/brand.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/website.css">
+<script src="/assets/website.js" defer></script><script src="/assets/auth.js" defer></script>
+{% block extra_head %}{% endblock %}
+</head>
+<body class="public-body">
+<a class="skip" href="#inhalt">Zum Inhalt springen</a>
+<div class="utility"><div class="wrap utility-inner"><span>Bildung im Corps. Verantwortung fürs Leben.</span><a href="{{ can_admin ? '/admin' : '/anmelden' }}">{{ can_admin ? 'Zur Verwaltung' : 'Referenten & Verwaltung' }} <span aria-hidden="true">↗</span></a></div></div>
+<header class="public-header"><div class="wrap navigation">
+<a class="wordmark" href="/" aria-label="Corpsakademie – Startseite"><img src="/assets/brand.svg" width="40" height="48" alt=""><span>CORPS<span>AKADEMIE</span></span></a>
+<button class="menu-toggle" type="button" aria-controls="hauptnavigation" aria-expanded="false">Menü <span aria-hidden="true">☰</span></button>
+<nav id="hauptnavigation" aria-label="Hauptnavigation">
+{% for href,label in {'/seminare':'Seminare','/termine':'Termine','/ueber-uns':'Über uns','/referenten':'Referenten','/kontakt':'Kontakt'} %}<a href="{{ href }}" {% if path == href or path starts with href ~ '/' %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+<a class="button button-small" href="/anfrage">Seminar anfragen <span aria-hidden="true">↗</span></a>
+</nav></div></header>
+<main id="inhalt" tabindex="-1">{% block content %}{% endblock %}</main>
+{% block bottom_cta %}<section class="closing"><div class="wrap closing-inner"><div><p class="eyebrow">GEMEINSAM DEN NÄCHSTEN SCHRITT GEHEN</p><h2>Welches Thema bewegt Ihr Corps?</h2><p>Wir unterstützen Sie dabei, das passende Seminar für Ihre Gemeinschaft zu finden.</p></div><a class="button button-gold" href="/anfrage">Seminar unverbindlich anfragen <span aria-hidden="true">↗</span></a></div></section>{% endblock %}
+<footer class="public-footer"><div class="wrap footer-grid">
+<div><a class="wordmark footer-brand" href="/"><img src="/assets/brand.svg" width="36" height="44" alt=""><span>CORPS<span>AKADEMIE</span></span></a><p>Persönlichkeit entwickeln.<br> Verantwortung übernehmen.<br> Im Corps verbunden bleiben.</p></div>
+<div><h2>Entdecken</h2><a href="/seminare">Unsere Seminare</a><a href="/referenten">Unsere Referenten</a><a href="/ueber-uns">Über die Akademie</a><a href="/termine">Seminare planen</a></div>
+<div><h2>Für Ihr Corps</h2><a href="/anfrage">Seminar anfragen</a><a href="/faq">Fragen & Antworten</a><a href="/kontakt">Kontakt aufnehmen</a><a href="/anmelden">Geschützter Zugang</a></div>
+<div class="footer-newsletter"><h2>Mit der Akademie verbunden bleiben</h2><p>Informationen zu Seminaren und neuen Themen für Ihr Corps.</p><a class="footer-subscribe" href="/newsletter">Zum Newsletter anmelden <span aria-hidden="true">→</span></a><small>Anmeldung mit E-Mail-Bestätigung. Jederzeit abmeldbar.</small></div>
+</div><div class="wrap footer-bottom"><span>© {{ 'now'|date('Y') }} Corpsakademie</span><div><a href="/impressum">Impressum</a><a href="/datenschutz">Datenschutz</a>{% if is_local %}<span class="preview-label">Lokale Präsentationsversion</span>{% endif %}</div></div></footer>
+</body></html>

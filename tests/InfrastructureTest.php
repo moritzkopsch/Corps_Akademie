@@ -20,7 +20,7 @@ final class InfrastructureTest extends Fixture
     public function testFreshMigrationIsIdempotentAndCreatesNoDefaultUser(): void
     {
         self::assertSame([], (new Migrator($this->c->db,$this->root.'/database/migrations'))->migrate());
-        self::assertSame(1,(int)$this->c->db->run('SELECT count(*) FROM schema_migrations')->fetchColumn());
+        self::assertSame(count(glob($this->root.'/database/migrations/*.sql')),(int)$this->c->db->run('SELECT count(*) FROM schema_migrations')->fetchColumn());
         self::assertSame(0,(int)$this->c->db->run('SELECT count(*) FROM users')->fetchColumn());
         self::assertSame('wal',$this->c->db->pdo->query('PRAGMA journal_mode')->fetchColumn());
         self::assertSame(1,(int)$this->c->db->pdo->query('PRAGMA foreign_keys')->fetchColumn());
@@ -43,9 +43,9 @@ final class InfrastructureTest extends Fixture
         self::assertSame('ok',$copy->query('PRAGMA integrity_check')->fetchColumn());
         self::assertSame(0600,fileperms($backup)&0777);
         $directory=$this->directory.'/migrations'; mkdir($directory);
-        copy($this->root.'/database/migrations/001_identity.sql',$directory.'/001_identity.sql');
-        file_put_contents($directory.'/002_test.sql','CREATE TABLE upgrade_probe(id INTEGER PRIMARY KEY);');
-        self::assertSame(['002_test.sql'],(new Migrator($this->c->db,$directory))->migrate());
+        foreach (glob($this->root.'/database/migrations/*.sql') as $file) { copy($file,$directory.'/'.basename($file)); }
+        file_put_contents($directory.'/999_test.sql','CREATE TABLE upgrade_probe(id INTEGER PRIMARY KEY);');
+        self::assertSame(['999_test.sql'],(new Migrator($this->c->db,$directory))->migrate());
         self::assertCount(2,glob($this->c->config->storagePath.'/backups/*.sqlite'));
     }
 
