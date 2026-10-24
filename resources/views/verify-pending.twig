@@ -1,0 +1,5 @@
+{% extends 'base.twig' %}
+{% block title %}E-Mail-Adresse bestätigen{% endblock %}
+{% block content %}<section class="narrow-page"><p class="eyebrow dark">FAST GESCHAFFT</p><h1>Ein Blick<br><em>in dein Postfach.</em></h1><p class="lead">Bitte bestätige deine E-Mail-Adresse {{ user.email }}. Öffne dazu den Bestätigungslink in unserer Nachricht und bestätige ihn auf der folgenden Seite.</p>{% if resent %}<p class="notice" role="status">Die erneute Anfrage wurde verarbeitet. Prüfe bitte dein Postfach. Ein erneuter Versand kann aus Sicherheitsgründen kurzzeitig begrenzt sein.</p>{% endif %}
+{% if is_local %}<p><a class="button button-navy" href="http://127.0.0.1:8025" target="_blank" rel="noopener noreferrer">Lokales Testpostfach öffnen <span aria-hidden="true">↗</span></a></p>{% endif %}
+<form method="post"><input type="hidden" name="_csrf" value="{{ csrf }}"><button class="text-button" type="submit">Bestätigungslink erneut anfordern</button></form></section>{% endblock %}

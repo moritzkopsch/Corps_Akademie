@@ -1,0 +1,27 @@
+{% extends 'base.twig' %}
+{% set titles = {'login':'Schön, dass du da bist.','setup':'Willkommen in deiner Akademie.','forgot':'Ein neues Passwort.','reset':'Dein neues Passwort.','verify':'E-Mail-Adresse bestätigen.','mfa':'Noch ein kurzer Sicherheitscheck.'} %}
+{% block title %}{{ titles[kind] }}{% endblock %}
+{% block content %}
+<section class="auth-layout"><aside class="auth-aside"><p class="eyebrow">CORPSAKADEMIE</p><h1>Persönlich.<br> Verbunden.<br> <em>Weiterkommen.</em></h1><p>Ein sicherer Zugang ist der Anfang guter Zusammenarbeit.</p><div class="aside-rule"></div><span>Wissen. Haltung. Persönlichkeit.</span></aside>
+<div class="auth-panel"><div class="form-card"><p class="eyebrow dark">DEIN GESCHÜTZTER ZUGANG</p><h2>{{ titles[kind] }}</h2>
+{% if kind == 'login' %}<p>Melde dich mit deiner E-Mail-Adresse und deinem Passwort an.</p>
+{% elseif kind == 'setup' %}<p>Richte das erste Administratorkonto ein. Anschließend bestätigst du deine E-Mail-Adresse und verbindest deine Authenticator-App.</p>
+{% elseif kind == 'forgot' %}<p>Wir senden dir einen einmalig verwendbaren Link, mit dem du dein Passwort ändern kannst.</p>
+{% elseif kind == 'reset' %}<p>Wähle ein langes, einzigartiges Passwort für dein Konto.</p>
+{% elseif kind == 'verify' %}<p>Bestätige deine E-Mail-Adresse mit einem Klick auf die Schaltfläche.</p>
+{% else %}<p>Gib den aktuellen Code deiner Authenticator-App oder einen unbenutzten Wiederherstellungscode ein.</p>{% endif %}
+{% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+<form method="post" {% if kind in ['setup','reset','verify'] %}data-token-form{% endif %}>
+<input type="hidden" name="_csrf" value="{{ csrf }}">
+{% if kind in ['setup','reset','verify'] %}<input type="hidden" name="token" value="{{ values.token }}"><p class="notice" data-token-notice>Öffne bitte den vollständigen Link aus deiner E-Mail oder aus der Ersteinrichtung.</p><noscript><p class="notice">Zum sicheren Öffnen dieses Links muss JavaScript im Browser aktiviert sein.</p></noscript>{% endif %}
+{% if kind == 'setup' %}<label for="name">Dein Name</label><input id="name" name="name" value="{{ values.name }}" autocomplete="name" maxlength="120" required>{% endif %}
+{% if kind in ['login','setup','forgot'] %}<label for="email">E-Mail-Adresse</label><input id="email" name="email" type="email" value="{{ values.email }}" autocomplete="username" maxlength="254" required>
+{% if is_local and kind == 'setup' %}<p class="field-hint">Lokale Testumgebung: Verwende eine Adresse mit @example.test. Die Bestätigung erscheint im <a href="http://127.0.0.1:8025" target="_blank" rel="noopener noreferrer">lokalen Testpostfach</a>.</p>{% endif %}{% endif %}
+{% if kind in ['login','setup','reset'] %}<label for="password">{{ kind == 'login' ? 'Passwort' : 'Neues Passwort' }}</label><input id="password" name="password" type="password" autocomplete="{{ kind == 'login' ? 'current-password' : 'new-password' }}" {% if kind != 'login' %}minlength="12" maxlength="200"{% else %}maxlength="1024"{% endif %} required>
+{% if kind != 'login' %}<p class="field-hint">Mindestens 12 Zeichen. Mehrere Wörter ergeben ein gut merkbares, langes Passwort.</p><label for="password-confirm">Passwort wiederholen</label><input id="password-confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="12" maxlength="200" required>{% endif %}{% endif %}
+{% if kind == 'mfa' %}<label for="code">Authenticator- oder Wiederherstellungscode</label><input id="code" name="code" autocomplete="one-time-code" maxlength="64" spellcheck="false" autocapitalize="off" required autofocus>{% endif %}
+<button class="button button-navy full-width" type="submit">{{ {'login':'Anmelden','setup':'Konto einrichten','forgot':'Link anfordern','reset':'Passwort speichern','verify':'E-Mail-Adresse bestätigen','mfa':'Sicher anmelden'}[kind] }} <span aria-hidden="true">→</span></button>
+</form>
+{% if kind == 'login' %}<p class="form-bottom"><a href="/passwort-vergessen">Passwort vergessen?</a></p>{% elseif kind in ['forgot','reset'] %}<p class="form-bottom"><a href="/anmelden">Zurück zur Anmeldung</a></p>{% endif %}
+</div></div></section>
+{% endblock %}

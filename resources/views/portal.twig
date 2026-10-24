@@ -1,0 +1,3 @@
+{% extends 'base.twig' %}
+{% block title %}Referentenportal{% endblock %}
+{% block content %}<section class="page"><p class="eyebrow dark">DEIN REFERENTENZUGANG</p><h1>Willkommen, <em>{{ user.name }}.</em></h1><p class="lead">Hier findest du deinen persönlichen Zugang zur Corpsakademie.</p><div class="card portal-card"><div><span class="section-number">PERSÖNLICHES KONTO</span><h2>{{ user.name }}</h2><p>{{ user.email }}</p><span class="badge">E-Mail bestätigt</span></div><a class="button button-navy" href="/konto">Mein Konto öffnen <span aria-hidden="true">→</span></a></div></section>{% endblock %}

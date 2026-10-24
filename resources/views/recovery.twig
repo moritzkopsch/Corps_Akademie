@@ -1,0 +1,3 @@
+{% extends 'base.twig' %}
+{% block title %}Wiederherstellungscodes sichern{% endblock %}
+{% block content %}<section class="narrow-page"><p class="eyebrow dark">ZUSÄTZLICHER SCHUTZ IST AKTIV</p><h1>Für den Fall<br><em>der Fälle.</em></h1><p class="lead">Bewahre diese Wiederherstellungscodes an einem sicheren Ort auf, zum Beispiel in deinem Passwortmanager. Damit erhältst du Zugang, wenn deine Authenticator-App nicht verfügbar ist.</p><div class="notice">Jeder Code funktioniert nur einmal. Diese Liste wird dir nur jetzt angezeigt.</div><ul class="recovery-grid">{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul><a class="button button-navy" href="/konto">Codes gesichert · Weiter zum Konto <span aria-hidden="true">→</span></a></section>{% endblock %}

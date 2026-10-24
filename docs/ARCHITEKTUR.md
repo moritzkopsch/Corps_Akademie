@@ -2,6 +2,8 @@
 
 Version 0.1 · 24. Oktober 2026 · Status: zur fachlichen und technischen Freigabe
 
+Umsetzungsnachtrag: Die lokale Entwicklungsumgebung sowie das erste ausführbare Fundament und Identitätsmodul wurden nach schrittweiser Freigabe umgesetzt. Der tatsächliche Stand ist in [Fundament](FUNDAMENT.md) dokumentiert. Die übrigen Module dieses Gesamtentwurfs und die offenen Geschäftsentscheidungen bleiben geplant beziehungsweise freizugebend.
+
 Grundlage ist die vom Auftraggeber übergebene konsolidierte Spezifikation „Corpsakademie 2.0“, Version 2.0. Dieses Dokument beschreibt das geplante Gesamtsystem. Es enthält keine implementierten Funktionen, keine ausführbaren Migrationen und keine Zusage einer bereits geprüften Hostingkompatibilität. Die Programmierung beginnt gemäß Auftrag erst nach Freigabe. Vorschläge zu noch offenen Geschäftsregeln sind ausdrücklich unverbindlich.
 
 ## 1. Interpretation und Anforderungsvalidierung

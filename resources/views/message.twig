@@ -1,0 +1,3 @@
+{% extends 'base.twig' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}<section class="narrow-page"><p class="eyebrow dark">DEIN ZUGANG</p><h1>{{ title }}</h1><p class="lead" role="status">{{ message }}</p><a class="button button-navy" href="{{ action_url }}">{{ action_label }} <span aria-hidden="true">→</span></a></section>{% endblock %}

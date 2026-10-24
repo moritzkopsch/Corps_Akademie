@@ -1,0 +1,8 @@
+{% extends 'base.twig' %}
+{% block title %}Willkommen{% endblock %}
+{% block content %}
+<section class="welcome"><div class="welcome-copy"><p class="eyebrow">DER PERSÖNLICHE ZUGANG</p><h1>Wissen, das verbindet.<br><em>Menschen, die bewegen.</em></h1><p class="lead">Willkommen im geschützten Bereich der Corpsakademie. Dein persönlicher Zugang zu unserer Gemeinschaft.</p>
+<a class="button button-gold" href="{{ authenticated ? '/konto' : '/anmelden' }}">{{ authenticated ? 'Mein Konto öffnen' : 'Zum persönlichen Zugang' }} <span aria-hidden="true">→</span></a></div>
+<div class="welcome-art" aria-hidden="true"><span class="art-circle"></span><span class="art-initial">C</span><span class="art-caption">PERSPEKTIVEN<br>GEMEINSAM ERWEITERN.</span><span class="art-line"></span></div></section>
+<section class="intro-grid"><div><span class="section-number">01 / VERBINDUNG</span><h2>Ein gemeinsamer Zugang.</h2><p>Für Referenten und die Menschen, die unsere Akademie gestalten.</p></div><div><span class="section-number">02 / VERTRAUEN</span><h2>Dein Konto. Gut geschützt.</h2><p>Mit bestätigter E-Mail-Adresse und zusätzlichem Schutz für sensible Zugänge.</p></div><div><span class="section-number">03 / PERSÖNLICH</span><h2>Dein eigener Bereich.</h2><p>Die Zugänge, die du für deine Aufgaben benötigst, an einem Ort.</p></div></section>
+{% endblock %}

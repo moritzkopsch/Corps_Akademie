@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}Geschützter Zugang{% endblock %} · Corpsakademie</title>
+  <link rel="stylesheet" href="/assets/app.css"><script src="/assets/auth.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+<header class="site-header"><div class="header-inner">
+  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">C</span><span>CORPSAKADEMIE<span class="brand-sub">Wissen. Haltung. Persönlichkeit.</span></span></a>
+  <nav aria-label="Hauptnavigation">
+    {% if can_admin %}<a href="/admin">Verwaltung</a>{% endif %}
+    {% if can_portal %}<a href="/portal">Mein Portal</a>{% endif %}
+    {% if authenticated %}<a href="/konto">Mein Konto</a>{% elseif user is null %}<a href="/anmelden">Anmelden <span aria-hidden="true">↗</span></a>{% endif %}
+    {% if user %}<form method="post" action="/abmelden"><input type="hidden" name="_csrf" value="{{ csrf }}"><button class="text-button" type="submit">Abmelden</button></form>{% endif %}
+  </nav>
+</div></header>
+<main id="inhalt" tabindex="-1">{% block content %}{% endblock %}</main>
+<footer><span>Corpsakademie</span><span>Persönlich verbunden. Gemeinsam weiter.</span></footer>
+</body></html>

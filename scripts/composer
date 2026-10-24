@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+task_root="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+umask 077
+export COMPOSER_HOME="$task_root/.local/composer"
+export COMPOSER_CACHE_DIR="$COMPOSER_HOME/cache"
+mkdir -p "$COMPOSER_HOME"
+exec composer "$@"
