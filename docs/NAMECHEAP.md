@@ -147,3 +147,9 @@ Zum dokumentierten Übergabestand bleibt `APP_MAIL_ENABLED=false`: Die Postfäch
 Der Betreiber hat die beiden bestehenden Postfachpasswörter über die geschützte Servereingabe eingetragen. TLS-Verbindung und SMTP-Anmeldung waren für `system@corps-akademie.r4av.com` und `newsletter@corps-akademie.r4av.com` erfolgreich. Das Einrichtungsskript hat die private Konfiguration aktiviert (`APP_MAIL_ENABLED=true`). Danach waren das öffentliche Newsletterformular und die Produktions-Konfigurations-/Datenbankprüfung erfolgreich.
 
 Die DNS-Abfrage lieferte TXT-Einträge für die Absenderdomain und ihren cPanel-DKIM-Selektor. Das allein ist noch keine vollständige Prüfung externer Zustellbarkeit. Der Empfang echter Testmails und die Abnahme der Abläufe bleiben gesondert zu prüfen. Die zuvor dokumentierte ausstehende Passworteingabe ist damit erledigt. Ein Admin-Konto wird durch die SMTP-Einrichtung nicht automatisch angelegt.
+
+### Zustellprüfung am 26.10.2026
+
+Nach ausdrücklicher Freigabe wurden zwei technische Testmails an `info@corps-akademie.r4av.com` gesendet: eine über den System-SMTP-Zugang und eine über den Newsletter-SMTP-Zugang. Beide wurden vom SMTP-Server angenommen und anschließend anhand der eindeutigen Testkennung im Info-Postfach nachgewiesen. Es wurde dabei weder eine Newsletter-Anmeldung vorgenommen noch eine Rundmail an Abonnenten freigegeben.
+
+Damit ist die Zustellung innerhalb derselben Hostingdomain nachgewiesen. Externe Zustellung, beispielsweise an Gmail oder GMX, sowie der vollständige Live-Ablauf mit Double-Opt-in und Abmeldung sind damit noch nicht abgenommen. Die geschützte Newsletter-Verwaltung ist unter `/admin/newsletter` erreichbar und setzt einen eingerichteten Admin-Zugang mit MFA voraus.
