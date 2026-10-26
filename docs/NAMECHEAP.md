@@ -141,3 +141,9 @@ Die tatsächliche Tarifquote muss vor einer Erhöhung geprüft werden. Namecheap
 Am 26.10.2026 wurde die Newsletter-Verwaltung auf Namecheap veröffentlicht und Migration `003_newsletter_campaigns.sql` erfolgreich angewandt. Die zwei oben beschriebenen Cronjobs wurden nach ausdrücklicher Versandfreigabe eingerichtet; bestehende Crontab-Einträge wurden erhalten und zuvor privat gesichert. Die Website antwortete danach mit HTTP 200, `/admin/newsletter` leitete nicht angemeldete Besucher zur Anmeldung weiter. Die gezielten Tests für Newsletter, öffentliche Abläufe und Konfiguration bestanden (31 Tests, 273 Assertions).
 
 Zum dokumentierten Übergabestand bleibt `APP_MAIL_ENABLED=false`: Die Postfächer bestehen, aber die SMTP-Passwörter müssen vom Betreiber noch über das interaktive Einrichtungsskript eingegeben werden. Eine echte Zustellprüfung und Admin-Ersteinrichtung stehen danach noch aus. Erst erfolgreiche SMTP-Prüfung und Aktivierung machen die Formulare und Versandläufe nutzbar.
+
+### SMTP-Aktivierung am 26.10.2026
+
+Der Betreiber hat die beiden bestehenden Postfachpasswörter über die geschützte Servereingabe eingetragen. TLS-Verbindung und SMTP-Anmeldung waren für `system@corps-akademie.r4av.com` und `newsletter@corps-akademie.r4av.com` erfolgreich. Das Einrichtungsskript hat die private Konfiguration aktiviert (`APP_MAIL_ENABLED=true`). Danach waren das öffentliche Newsletterformular und die Produktions-Konfigurations-/Datenbankprüfung erfolgreich.
+
+Die DNS-Abfrage lieferte TXT-Einträge für die Absenderdomain und ihren cPanel-DKIM-Selektor. Das allein ist noch keine vollständige Prüfung externer Zustellbarkeit. Der Empfang echter Testmails und die Abnahme der Abläufe bleiben gesondert zu prüfen. Die zuvor dokumentierte ausstehende Passworteingabe ist damit erledigt. Ein Admin-Konto wird durch die SMTP-Einrichtung nicht automatisch angelegt.
