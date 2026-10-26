@@ -135,3 +135,9 @@ Alle fünf Minuten für Bestätigungsmails, zeitlich versetzt für Rundmails:
 `--if-enabled` beendet den Lauf bei abgeschaltetem Mailversand ohne Fehler. Der Newsletter-Worker begrenzt in Produktion zusätzlich datenbankgestützt auf höchstens einen Versandversuch je fünf Minuten, auch bei parallel gestarteten Workern. Zusammen mit diesen Cronjobs sind zunächst bis zu 36 Bestätigungsmails und 12 Rundmails pro Stunde vorgesehen; manuelle zusätzliche Bestätigungsworker und sonstiger Postfachversand können das Domainkontingent zusätzlich belasten.
 
 Die tatsächliche Tarifquote muss vor einer Erhöhung geprüft werden. Namecheap nennt je nach Paket unterschiedliche Grenzen: https://www.namecheap.com/legal/hosting/aup/ . Zustellbarkeit/SPF/DKIM: https://docs.cpanel.net/cpanel/email/email-deliverability-in-cpanel/ . Große Verteiler benötigen eine gesonderte Kapazitätsplanung; die konservative Grundeinstellung ist für den Start gedacht.
+
+### Bereitstellungsstand dieser Erweiterung
+
+Am 26.10.2026 wurde die Newsletter-Verwaltung auf Namecheap veröffentlicht und Migration `003_newsletter_campaigns.sql` erfolgreich angewandt. Die zwei oben beschriebenen Cronjobs wurden nach ausdrücklicher Versandfreigabe eingerichtet; bestehende Crontab-Einträge wurden erhalten und zuvor privat gesichert. Die Website antwortete danach mit HTTP 200, `/admin/newsletter` leitete nicht angemeldete Besucher zur Anmeldung weiter. Die gezielten Tests für Newsletter, öffentliche Abläufe und Konfiguration bestanden (31 Tests, 273 Assertions).
+
+Zum dokumentierten Übergabestand bleibt `APP_MAIL_ENABLED=false`: Die Postfächer bestehen, aber die SMTP-Passwörter müssen vom Betreiber noch über das interaktive Einrichtungsskript eingegeben werden. Eine echte Zustellprüfung und Admin-Ersteinrichtung stehen danach noch aus. Erst erfolgreiche SMTP-Prüfung und Aktivierung machen die Formulare und Versandläufe nutzbar.
