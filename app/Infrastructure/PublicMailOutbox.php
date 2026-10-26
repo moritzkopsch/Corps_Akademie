@@ -30,7 +30,8 @@ final class PublicMailOutbox
             $row=$this->db->immediate(function() use (&$results): ?array {
                 $now=$this->clock->now()->getTimestamp();
                 $results['ambiguous']+=$this->db->run("UPDATE public_mail_outbox SET status='ambiguous',payload_ciphertext=NULL,last_error_redacted='Lease abgelaufen; vor Neuversand klären' WHERE status='sending' AND lease_until<=?",[$now])->rowCount();
-                $row=$this->db->one("SELECT * FROM public_mail_outbox WHERE status='queued' ORDER BY id LIMIT 1");
+                // SKIP LOCKED verhindert, dass zwei Worker dieselbe Nachricht leasen.
+                $row=$this->db->one("SELECT * FROM public_mail_outbox WHERE status='queued' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED");
                 if ($row===null) { return null; }
                 $row['lease_token']=Crypto::token();
                 $this->db->run("UPDATE public_mail_outbox SET status='sending',lease_token=?,lease_until=? WHERE id=? AND status='queued'",[$row['lease_token'],$now+300,$row['id']]);

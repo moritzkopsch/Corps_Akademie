@@ -6,6 +6,8 @@ Prüfstand: 24. Oktober 2026. Grundlage: Architekturentwurf und lokale Umgebungs
 
 **Nachtrag zum folgenden Entwicklungspaket:** Das erste ausführbare Fundament einschließlich Identitätsmodul ist nun lokal umgesetzt. Die Abgrenzung zu den noch offenen Geschäftsmodulen und die geprüften Sicherheitsabläufe stehen in [Fundament](FUNDAMENT.md). Die Hostingfreigabe für den unbekannten Kundenserver bleibt offen.
 
+**Nachtrag zur Datenbankentscheidung:** Der Auftraggeber hat sich für PostgreSQL entschieden; die Anwendung wurde von SQLite auf PostgreSQL ab Version 10 umgestellt. Alle SQLite-bezogenen Prüfungen, Anforderungen und Bewertungen weiter unten beschreiben deshalb den damaligen Prüfstand vom 24. Oktober 2026 und sind nicht mehr der aktuelle Stand. Verbindlich sind die PostgreSQL-Abschnitte in [Architektur und offene Geschäftsentscheidungen](ARCHITEKTUR.md) und die Einrichtung in [Namecheap/cPanel](NAMECHEAP.md).
+
 ## Ergebnis
 
 **Die Plattform kann auf dem vorhandenen Mac entwickelt werden.** Die benötigten PHP-Erweiterungen sind vorhanden; grundlegende SQLite-Funktionen einschließlich Schreibsperre zwischen zwei Prozessen und konsistentem Backup funktionieren. Vor dem Aufbau sind der PHP-Patchstand zu aktualisieren und die Entwicklungswerkzeuge zu ergänzen.
@@ -117,8 +119,8 @@ Erst nach Abnahme werden Release, freigegebene Inhalte und produktive Konfigurat
 
 Die Anwendung bleibt anbieterneutral, braucht aber einen überprüfbaren technischen Rahmen:
 
-- Gepflegtes PHP samt benötigten Erweiterungen, kompatibler CLI und geeigneter SQLite-Bibliothek.
-- Geeigneter lokaler Speicher mit verlässlichem Dateilocking; SQLite und private Dateien außerhalb des Webroots.
+- Gepflegtes PHP samt benötigten Erweiterungen (`pdo_pgsql`, `pgsql`), kompatibler CLI und erreichbarem PostgreSQL ab Version 10.
+- Geeigneter privater Speicher für Protokolle, Medien und Sicherungen; Konfiguration und Datenbankzugang außerhalb des Webroots.
 - Zulässige zeitgesteuerte PHP-CLI-Ausführung mit ausreichenden Laufzeit- und Speicherlimits.
 - HTTPS, korrekte Domainkonfiguration und geschützte Geheimnisse.
 - Ausreichende SMTP-Quote, erlaubte Versandidentitäten und nutzbarer Rückläuferweg.

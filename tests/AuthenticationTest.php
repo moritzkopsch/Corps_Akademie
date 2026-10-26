@@ -131,8 +131,7 @@ final class AuthenticationTest extends Fixture
     public function testAdministrativePermissionRequiresMfaEvenWithCustomRole(): void
     {
         $user=$this->account();
-        $this->c->db->run("INSERT INTO roles(code,label,protected) VALUES('custom','Custom',0)");
-        $role=(int)$this->c->db->pdo->lastInsertId();
+        $role=(int)$this->c->db->run("INSERT INTO roles(code,label,protected) VALUES('custom','Custom',0) RETURNING id")->fetchColumn();
         $this->c->db->run('INSERT INTO user_roles(user_id,role_id) VALUES(?,?)',[$user['id'],$role]);
         $this->c->db->run("INSERT INTO role_permissions(role_id,permission_id) SELECT ?,id FROM permissions WHERE code='admin.access'",[$role]);
         self::assertSame('/sicherheit/einrichten',$this->login()->headers->get('Location'));

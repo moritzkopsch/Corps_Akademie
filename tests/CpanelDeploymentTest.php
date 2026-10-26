@@ -15,6 +15,7 @@ final class CpanelDeploymentTest extends TestCase
     private string $base;
     private string $webroot;
     private string $root;
+    private ?string $schema = null;
 
     protected function setUp(): void
     {
@@ -31,10 +32,61 @@ final class CpanelDeploymentTest extends TestCase
         $deployment->initialize();
         file_put_contents($this->base.'/shared/deploy.json',json_encode(['webroot'=>$this->webroot,'composer'=>$this->directory.'/composer.php','replace_existing_site'=>false]));
         file_put_contents($this->directory.'/composer.php','<?php exit(0);');
+        $database=$this->database();
         $env=file_get_contents($this->base.'/shared/.env');
-        $env=str_replace(['https://CHANGE-ME.invalid','smtps://CHANGE-ME:CHANGE-ME@CHANGE-ME.invalid:465','CHANGE-ME@CHANGE-ME.invalid'],['https://akademie.example.test','smtps://test:test@smtp.example.test:465','system@example.test'],$env);
+        $env=str_replace(
+            ['https://CHANGE-ME.invalid','smtps://CHANGE-ME:CHANGE-ME@CHANGE-ME.invalid:465','CHANGE-ME@CHANGE-ME.invalid','APP_DB_HOST=localhost','APP_DB_PORT=5432','APP_DB_NAME=CHANGE-ME','APP_DB_USER=CHANGE-ME','APP_DB_PASSWORD="CHANGE-ME"'],
+            ['https://akademie.example.test','smtps://test:test@smtp.example.test:465','system@example.test','APP_DB_HOST='.$database['host'],'APP_DB_PORT='.$database['port'],'APP_DB_NAME='.$database['name'],'APP_DB_USER='.$database['user'],'APP_DB_PASSWORD="'.str_replace(['\\','"'],['\\\\','\\"'],$database['password']).'"'],
+            $env
+        );
         file_put_contents($this->base.'/shared/.env',$env);
         return $deployment;
+    }
+
+    private function database(): array
+    {
+        return [
+            'host'=>(string)(getenv('TEST_DB_HOST')?:'127.0.0.1'),
+            'port'=>(string)(getenv('TEST_DB_PORT')?:'5432'),
+            'name'=>(string)(getenv('TEST_DB_NAME')?:'corpsakademie_test'),
+            'user'=>(string)(getenv('TEST_DB_USER')?:'corpsakademie'),
+            'password'=>(string)(getenv('TEST_DB_PASSWORD')?:'korps-test-password'),
+        ];
+    }
+
+    private function pdo(array $database): \PDO
+    {
+        return new \PDO(sprintf('pgsql:host=%s;port=%s;dbname=%s',$database['host'],$database['port'],$database['name']),$database['user'],$database['password'],[
+            \PDO::ATTR_ERRMODE=>\PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE=>\PDO::FETCH_ASSOC,
+        ]);
+    }
+
+    // The complete pipeline runs db:migrate and doctor in the new release and therefore needs a real PostgreSQL schema.
+    private function isolatedSchema(): array
+    {
+        $database=$this->database();
+        if (getenv('TEST_DB_USER')===false || getenv('TEST_DB_PASSWORD')===false) {
+            self::markTestSkipped('PostgreSQL-Testdatenbank fehlt. TEST_DB_NAME, TEST_DB_USER und TEST_DB_PASSWORD setzen.');
+        }
+        $this->schema='corps_cpanel_'.bin2hex(random_bytes(4));
+        try {
+            $pdo=$this->pdo($database);
+            $pdo->exec('DROP SCHEMA IF EXISTS '.$this->schema.' CASCADE');
+            $pdo->exec('CREATE SCHEMA '.$this->schema);
+        } catch (\PDOException $error) {
+            self::markTestSkipped('Die PostgreSQL-Testdatenbank ist nicht erreichbar: '.$error->getMessage());
+        }
+        // libpq übernimmt PGOPTIONS für jede Verbindung, also auch für die Kindprozesse des Deployments.
+        putenv('PGOPTIONS=-c search_path='.$this->schema);
+        return $database;
+    }
+
+    private function assertMigrated(array $database): void
+    {
+        $pdo=$this->pdo($database);
+        $tables=$pdo->query('SELECT count(*) FROM information_schema.tables WHERE table_schema='.$pdo->quote((string)$this->schema)." AND table_name IN ('schema_migrations','seminars','users')")->fetchColumn();
+        self::assertSame(3,(int)$tables);
     }
 
     public function testInitIsIdempotentAndNeverReplacesKeyOrExistingData(): void
@@ -61,10 +113,10 @@ final class CpanelDeploymentTest extends TestCase
         $deployment=$this->prepare();
         self::assertSame($this->webroot,$deployment->check()['webroot']);
         self::assertSame([],array_values(array_diff(scandir($this->webroot),['.','..'])));
-        rmdir($this->base.'/shared/storage/database');
+        rmdir($this->base.'/releases');
         try { $deployment->check(); self::fail('Missing directory accepted'); }
         catch (\RuntimeException) {}
-        self::assertDirectoryDoesNotExist($this->base.'/shared/storage/database');
+        self::assertDirectoryDoesNotExist($this->base.'/releases');
     }
 
     public function testCheckRejectsExistingWebsiteAndSensitiveFilesWithoutChangingThem(): void
@@ -133,15 +185,15 @@ final class CpanelDeploymentTest extends TestCase
         } finally { flock($lock,LOCK_UN); fclose($lock); }
     }
 
-    public function testRuntimeRejectsAnOldSqliteVersion(): void
+    public function testRuntimeRejectsAMissingPostgresDriver(): void
     {
-        $data=Runtime::inspect(); $data['sqlite']='3.34.1';
+        $data=Runtime::inspect(); $data['pgsql']=null;
         $this->expectException(\RuntimeException::class); Runtime::validate($data);
     }
 
     public function testCompleteDeploymentBuildsPrivateReleaseAndKeepsSecretsOutsideWebroot(): void
     {
-        $deployment=$this->pipeline();
+        [$deployment,$database]=$this->pipeline();
         $env=file_get_contents($this->base.'/shared/.env');
         $deployment->deploy();
         self::assertTrue(is_link($this->base.'/current'));
@@ -150,23 +202,24 @@ final class CpanelDeploymentTest extends TestCase
         self::assertFileExists($this->webroot.'/assets/website.css');
         self::assertFileDoesNotExist($this->webroot.'/.env'); self::assertDirectoryDoesNotExist($this->webroot.'/vendor');
         self::assertFileDoesNotExist($this->base.'/shared/maintenance.flag');
-        self::assertFileExists($this->base.'/shared/storage/database/application.sqlite');
-        self::assertSame('ok',(new \PDO('sqlite:'.$this->base.'/shared/storage/database/application.sqlite'))->query('PRAGMA integrity_check')->fetchColumn());
+        self::assertDirectoryExists($this->base.'/shared/storage');
+        $this->assertMigrated($database);
     }
 
     public function testFailureAfterMigrationStaysInMaintenanceAndDoesNotSwitchRelease(): void
     {
-        $deployment=$this->pipeline(true);
+        [$deployment,$database]=$this->pipeline(true);
         mkdir($this->base.'/releases/previous'); symlink($this->base.'/releases/previous',$this->base.'/current');
         try { $deployment->deploy(); self::fail('Synthetic doctor failure ignored'); }
         catch (\RuntimeException $error) { self::assertStringContainsString('Deployment-Schritt',$error->getMessage()); }
         self::assertSame($this->base.'/releases/previous',realpath($this->base.'/current'));
         self::assertFileExists($this->base.'/shared/maintenance.flag');
-        self::assertFileExists($this->base.'/shared/storage/database/application.sqlite');
+        $this->assertMigrated($database);
     }
 
-    private function pipeline(bool $failDoctor = false): Deployment
+    private function pipeline(bool $failDoctor = false): array
     {
+        $database=$this->isolatedSchema();
         $this->prepare();
         foreach (['app','bin','database','public','resources','deployment'] as $directory) { $this->copyDirectory($this->root.'/'.$directory,$this->source.'/'.$directory); }
         copy($this->root.'/composer.json',$this->source.'/composer.json');
@@ -182,12 +235,12 @@ final class CpanelDeploymentTest extends TestCase
         foreach ([['git','init','-q'],['git','add','.'],['git','-c','user.name=Deployment Test','-c','user.email=test@example.test','-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null','commit','-qm','Test fixture']] as $command) {
             $result=$this->process($command,$this->source); self::assertSame(0,$result['code'],$result['err']);
         }
-        return new Deployment($this->source,$this->base,function(string $url): array {
+        return [new Deployment($this->source,$this->base,function(string $url): array {
             $file=$this->webroot.parse_url($url,PHP_URL_PATH);
             $result=$this->process([PHP_BINARY,'-r','$_SERVER["HTTPS"]="on"; require $argv[1];',$file]);
             self::assertSame(0,$result['code'],$result['err']);
             return [200,$result['out']];
-        });
+        }),$database];
     }
 
     private function process(array $command, ?string $directory = null): array
@@ -209,6 +262,10 @@ final class CpanelDeploymentTest extends TestCase
 
     protected function tearDown(): void
     {
+        if ($this->schema!==null) {
+            try { $this->pdo($this->database())->exec('DROP SCHEMA IF EXISTS '.$this->schema.' CASCADE'); } catch (\Throwable) {}
+            $this->schema=null;
+        }
         $iterator=new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->directory,\FilesystemIterator::SKIP_DOTS),\RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($iterator as $file) { $file->isDir() && !$file->isLink()?rmdir($file->getPathname()):unlink($file->getPathname()); }
         rmdir($this->directory);

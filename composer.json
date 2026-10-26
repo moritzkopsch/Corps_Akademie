@@ -4,11 +4,11 @@
   "type": "project",
   "license": "proprietary",
   "require": {
-    "php": "~8.4.27 || ~8.5.12",
+    "php": "~8.2.35 || ~8.3.36 || ~8.4.27 || ~8.5.12",
     "ext-curl": "*",
     "ext-intl": "*",
     "ext-mbstring": "*",
-    "ext-pdo_sqlite": "*",
+    "ext-pdo_pgsql": "*",
     "ext-sodium": "*",
     "ext-xmlwriter": "*",
     "bacon/bacon-qr-code": "^3.0",
@@ -31,7 +31,7 @@
   "config": {
     "allow-plugins": false,
     "sort-packages": true,
-    "platform": { "php": "8.4.27" }
+    "platform": { "php": "8.2.35" }
   },
   "scripts": { "test": "phpunit", "check": "@php scripts/check-local.php" }
 }

@@ -1,10 +1,10 @@
 # Corpsakademie 2.0
 
-Individuelle Seminarplattform mit PHP und SQLite. Aktueller Implementierungsstand: sicheres Identitätsmodul, öffentliche Website, Seminar- und Referentenverwaltung, verifizierte Gastanfragen und Newsletter-Anmeldung mit Double-Opt-in. Referentenkalender, automatische Buchungskoordination, Angebote und Newsletter-Kampagnen folgen in weiteren Modulen.
+Individuelle Seminarplattform mit PHP und PostgreSQL. Aktueller Implementierungsstand: sicheres Identitätsmodul, öffentliche Website, Seminar- und Referentenverwaltung, verifizierte Gastanfragen und Newsletter-Anmeldung mit Double-Opt-in. Referentenkalender, automatische Buchungskoordination, Angebote und Newsletter-Kampagnen folgen in weiteren Modulen.
 
 ## Lokal starten
 
-Voraussetzungen: korrigiertes PHP 8.4 ab 8.4.27 oder PHP 8.5 ab 8.5.12, Composer und die in composer.json aufgeführten Erweiterungen. SQLite muss mindestens 3.51.3 enthalten; die zurückgezogene Version 3.52.0 wird abgewiesen. Geprüft ist lokal PHP 8.5.12 mit SQLite 3.54.1.
+Voraussetzungen: ein PHP mit den Korrekturen für CVE-2026-109618/CVE-2026-109619 (8.2 ab 8.2.35, 8.3 ab 8.3.36, 8.4 ab 8.4.27 oder 8.5 ab 8.5.12), Composer, PostgreSQL ab Version 10 und die in composer.json aufgeführten Erweiterungen. Die Anwendung nutzt Identitätsspalten und `FOR UPDATE SKIP LOCKED`; ältere Server werden abgewiesen. PostgreSQL 10 ist seit November 2022 ohne Herstellersupport – produktiv ist ein aktuell gepflegter Server vorzuziehen.
 
 ```bash
 bash scripts/composer install
@@ -15,7 +15,7 @@ php bin/console doctor
 php bin/console content:seed
 ```
 
-Der Installer erzeugt eine private `.env` mit zufälligem Anwendungsschlüssel sowie die SQLite-Datenbank außerhalb des Webroots. Er legt kein Konto mit Standardzugangsdaten an. Bestehende Konfiguration und Daten werden bei wiederholter Installation nicht ersetzt.
+Der Installer erzeugt eine private `.env` mit zufälligem Anwendungsschlüssel, prüft die Verbindung zur PostgreSQL-Datenbank und wendet die Migrationen an. Datenbank und Sicherungen liegen außerhalb des Webroots. Er legt kein Konto mit Standardzugangsdaten an. Bestehende Konfiguration und Daten werden bei wiederholter Installation nicht ersetzt.
 
 Drei getrennte Terminalfenster im Projektordner:
 
@@ -59,7 +59,7 @@ php scripts/check-local.php
 php scripts/check-live.php
 ```
 
-Automatisierte Fachtests verwenden eigene temporäre SQLite-Dateien und einen Mail-Testadapter. Die optionale Live-Prüfung testet zusätzlich die HTTP-Grenzen und den echten Anwendungs-Mailer über SMTP mit einer separaten, anschließend entfernten Testdatenbank. Sie verändert keine Benutzerkonten der laufenden Anwendung.
+Automatisierte Fachtests verwenden ein eigenes PostgreSQL-Schema je Lauf und einen Mail-Testadapter. Ohne `TEST_DB_NAME`, `TEST_DB_USER` und `TEST_DB_PASSWORD` werden die datenbankgebundenen Tests übersprungen. Die optionale Live-Prüfung testet zusätzlich die HTTP-Grenzen und den echten Anwendungs-Mailer über SMTP mit einem separaten, anschließend entfernten Schema. Sie verändert keine Benutzerkonten der laufenden Anwendung.
 
 ## Weitere Konten und Betrieb
 

@@ -11,7 +11,12 @@ final class Config
     public readonly string $url;
     public readonly string $key;
     public readonly string $keyId;
-    public readonly string $databasePath;
+    public readonly string $databaseHost;
+    public readonly int $databasePort;
+    public readonly string $databaseName;
+    public readonly string $databaseUser;
+    public readonly string $databasePassword;
+    public readonly string $databaseDsn;
     public readonly string $storagePath;
     public readonly int $idleSeconds;
     public readonly int $absoluteSeconds;
@@ -25,7 +30,7 @@ final class Config
 
     public function __construct(public readonly string $root, array $values)
     {
-        if (!self::runtimeSupported(PHP_VERSION)) { throw new \RuntimeException('Benötigt wird ein korrigiertes PHP 8.4 ab 8.4.27 oder PHP 8.5 ab 8.5.12.'); }
+        if (!self::runtimeSupported(PHP_VERSION)) { throw new \RuntimeException('Benötigt wird ein PHP mit den Korrekturen für CVE-2026-109618/CVE-2026-109619: 8.2 ab 8.2.35, 8.3 ab 8.3.36, 8.4 ab 8.4.27 oder 8.5 ab 8.5.12.'); }
         $this->environment = (string) ($values['APP_ENV'] ?? 'production');
         if (!in_array($this->environment, ['local', 'test', 'staging', 'production'], true)) {
             throw new \RuntimeException('APP_ENV ist ungültig.');
@@ -52,7 +57,16 @@ final class Config
         $this->keyId = (string) ($values['APP_KEY_ID'] ?? 'v1');
         if (!preg_match('/^[A-Za-z0-9_-]{1,40}$/D',$this->keyId)) { throw new \RuntimeException('APP_KEY_ID ist ungültig.'); }
         $this->storagePath = $this->privatePath((string) ($values['APP_STORAGE_PATH'] ?? 'storage'), true);
-        $this->databasePath = $this->privatePath((string) ($values['APP_DB_PATH'] ?? 'storage/database/application.sqlite'), false);
+        $this->databaseHost = $this->databaseIdentifier($values['APP_DB_HOST'] ?? '', 'APP_DB_HOST');
+        $this->databasePort = $this->port($values['APP_DB_PORT'] ?? 5432);
+        $this->databaseName = $this->databaseIdentifier($values['APP_DB_NAME'] ?? '', 'APP_DB_NAME');
+        $this->databaseUser = $this->databaseIdentifier($values['APP_DB_USER'] ?? '', 'APP_DB_USER');
+        $password = $values['APP_DB_PASSWORD'] ?? '';
+        if (!is_string($password) || $password === '' || str_contains($password, "\0")) {
+            throw new \RuntimeException('APP_DB_PASSWORD fehlt oder ist ungültig.');
+        }
+        $this->databasePassword = $password;
+        $this->databaseDsn = sprintf('pgsql:host=%s;port=%d;dbname=%s', $this->databaseHost, $this->databasePort, $this->databaseName);
         $this->idleSeconds = $this->positiveInteger($values['SESSION_IDLE_SECONDS'] ?? 1800);
         $this->absoluteSeconds = $this->positiveInteger($values['SESSION_ABSOLUTE_SECONDS'] ?? 43200);
         if ($this->idleSeconds > $this->absoluteSeconds) {
@@ -113,8 +127,28 @@ final class Config
 
     public static function runtimeSupported(string $version): bool
     {
-        return (version_compare($version,'8.4.27','>=') && version_compare($version,'8.5.0','<'))
-            || (version_compare($version,'8.5.12','>=') && version_compare($version,'8.6.0','<'));
+        // Every maintained branch patched for CVE-2026-109618 and CVE-2026-109619.
+        static $patched=['8.2'=>'8.2.35','8.3'=>'8.3.36','8.4'=>'8.4.27','8.5'=>'8.5.12'];
+        if (preg_match('/^(\d+\.\d+)\.\d+/',$version,$matches)!==1) { return false; }
+        return isset($patched[$matches[1]]) && version_compare($version,$patched[$matches[1]],'>=');
+    }
+
+    private function databaseIdentifier(mixed $value, string $key): string
+    {
+        // No separators or whitespace: values are embedded in the DSN or passed to pg_dump as arguments.
+        if (!is_string($value) || !preg_match('/^[A-Za-z0-9_.-]{1,63}$/D', $value)) {
+            throw new \RuntimeException($key . ' fehlt oder ist ungültig.');
+        }
+        return $value;
+    }
+
+    private function port(mixed $value): int
+    {
+        $port = filter_var($value, FILTER_VALIDATE_INT);
+        if ($port === false || $port < 1 || $port > 65535) {
+            throw new \RuntimeException('APP_DB_PORT ist ungültig.');
+        }
+        return $port;
     }
 
     private function privatePath(string $path, bool $directory): string

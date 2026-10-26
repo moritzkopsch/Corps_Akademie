@@ -17,10 +17,10 @@ function fetchLocal(string $url,array $headers=[]): array
     return ['status'=>curl_getinfo($request,CURLINFO_RESPONSE_CODE),'body'=>$body];
 }
 
-$directory=null; $c=null;
+$directory=null; $c=null; $schema=null;
 try {
     if (fetchLocal('http://127.0.0.1:8080/anmelden')['status']!==200) { throw new RuntimeException('Die Anmeldung ist nicht erreichbar.'); }
-    foreach (['/.env','/storage/database/application.sqlite','/vendor/autoload.php','/database/migrations/001_identity.sql','/app/Container.php'] as $path) {
+    foreach (['/.env','/vendor/autoload.php','/database/migrations/001_identity.sql','/app/Container.php'] as $path) {
         if (fetchLocal('http://127.0.0.1:8080'.$path)['status']!==404) { throw new RuntimeException('Privater Pfad ist nicht korrekt abgeschirmt: '.$path); }
     }
     if (fetchLocal('http://127.0.0.1:8080/admin')['status']!==303) { throw new RuntimeException('Administrationszugriff wird nicht zur Anmeldung geleitet.'); }
@@ -32,11 +32,16 @@ try {
     umask(0077);
     $directory=sys_get_temp_dir().'/corpsakademie-live-'.bin2hex(random_bytes(8)); mkdir($directory,0700);
     $root=dirname(__DIR__);
+    // The live check uses its own PostgreSQL schema so no production table is touched.
+    $schema='corps_live_'.bin2hex(random_bytes(4));
     $c=new Container(new Config($root,[
         'APP_ENV'=>'test','APP_URL'=>'http://127.0.0.1:8080','APP_KEY'=>base64_encode(random_bytes(32)),
-        'APP_DB_PATH'=>$directory.'/database.sqlite','APP_STORAGE_PATH'=>$directory.'/storage',
+        'APP_DB_HOST'=>(string)(getenv('PGHOST')?:'127.0.0.1'),'APP_DB_PORT'=>(string)(getenv('PGPORT')?:'5432'),
+        'APP_DB_NAME'=>(string)(getenv('PGDATABASE')?:'postgres'),'APP_DB_USER'=>(string)(getenv('PGUSER')?:''),'APP_DB_PASSWORD'=>(string)(getenv('PGPASSWORD')?:''),
+        'APP_STORAGE_PATH'=>$directory.'/storage',
         'MAILER_DSN'=>'smtp://127.0.0.1:1025','MAIL_FROM'=>'system@example.test',
     ]));
+    $c->db->pdo->exec('CREATE SCHEMA '.$schema); $c->db->pdo->exec('SET search_path TO '.$schema);
     (new Migrator($c->db,$root.'/database/migrations'))->migrate();
     $recipient='smtp-check-'.bin2hex(random_bytes(8)).'@example.test';
     $user=$c->accounts->create($recipient,'Temporäre SMTP-Prüfung',bin2hex(random_bytes(24)),'instructor',true);
@@ -59,6 +64,9 @@ try {
     fwrite(STDERR,'[FEHLER] '.$error->getMessage().PHP_EOL);
     $exitCode=1;
 } finally {
+    if ($c instanceof Container && $schema!==null) {
+        try { $c->db->pdo->exec('DROP SCHEMA IF EXISTS '.$schema.' CASCADE'); } catch (Throwable) {}
+    }
     $c=null;
     if ($directory!==null && is_dir($directory)) {
         $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);

@@ -122,11 +122,13 @@ $console->add((new Command('session:prune'))->setDescription('Abgelaufene oder w
 $console->add((new Command('doctor'))->setDescription('Konfiguration, Datenbankintegrität und Migrationsstand prüfen, ohne Geheimnisse auszugeben.')
     ->setCode(static function(InputInterface $input,OutputInterface $output) use ($container,$root): int {
         $c=$container();
+        $server=(string)$c->db->pdo->query('SHOW server_version')->fetchColumn();
         $checks=[
             'PHP-Patchstand'=>Config::runtimeSupported(PHP_VERSION),
-            'Datenbankintegrität'=>$c->db->pdo->query('PRAGMA integrity_check')->fetchColumn()==='ok',
-            'Fremdschlüssel aktiv'=>(int)$c->db->pdo->query('PRAGMA foreign_keys')->fetchColumn()===1,
-            'Fremdschlüssel konsistent'=>$c->db->pdo->query('PRAGMA foreign_key_check')->fetchAll()===[],
+            'Datenbankverbindung'=>(int)$c->db->pdo->query('SELECT 1')->fetchColumn()===1,
+            'PostgreSQL mindestens 10'=>version_compare($server,'10','>='),
+            // PostgreSQL erzwingt Fremdschlüssel serverseitig; geprüft wird, dass die Migrationen sie angelegt haben.
+            'Fremdschlüsselregeln vorhanden'=>(int)$c->db->pdo->query("SELECT count(*) FROM information_schema.table_constraints WHERE constraint_type='FOREIGN KEY' AND table_schema=current_schema()")->fetchColumn()>0,
         ];
         $applied=$c->db->run('SELECT migration,checksum FROM schema_migrations')->fetchAll();
         foreach ($applied as $migration) {

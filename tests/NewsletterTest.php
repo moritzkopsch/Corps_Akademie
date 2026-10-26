@@ -11,8 +11,7 @@ final class NewsletterTest extends Fixture
 {
     private function subscriber(string $email='reader@example.test',string $state='active'): int
     {
-        $this->c->db->run('INSERT INTO newsletter_subscribers(email,email_key,state,consent_version,requested_at,confirmed_at) VALUES(?,?,?,?,?,?)',[$email,$email,$state,'test-consent',$this->clock->timestamp,$state==='active'?$this->clock->timestamp:null]);
-        return (int)$this->c->db->pdo->lastInsertId();
+        return (int)$this->c->db->run('INSERT INTO newsletter_subscribers(email,email_key,state,consent_version,requested_at,confirmed_at) VALUES(?,?,?,?,?,?) RETURNING id',[$email,$email,$state,'test-consent',$this->clock->timestamp,$state==='active'?$this->clock->timestamp:null])->fetchColumn();
     }
     private function draft(int $actor): int { return $this->c->newsletter->save($actor,['subject'=>'Impulse für Ihr Corps','body'=>'Gemeinsam weiterkommen.'],null); }
     private function admin(): int { return (int)$this->account('admin@example.test','admin')['id']; }

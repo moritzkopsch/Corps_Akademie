@@ -8,9 +8,9 @@ Grundlage ist die vom Auftraggeber übergebene konsolidierte Spezifikation „Co
 
 ## 1. Interpretation und Anforderungsvalidierung
 
-Entwickelt wird eine individuell programmierte Seminarplattform mit drei Oberflächen: öffentliche Website, Administration und Referentenportal. Alle verwenden dieselben Geschäftsregeln und eine zentrale SQLite-Datenbank. Kern ist die zuverlässige Koordination individueller Seminaranfragen vom verifizierten Kundenkontakt über Referentenzusagen und Angebote bis zur verbindlichen Terminbestätigung.
+Entwickelt wird eine individuell programmierte Seminarplattform mit drei Oberflächen: öffentliche Website, Administration und Referentenportal. Alle verwenden dieselben Geschäftsregeln und eine zentrale PostgreSQL-Datenbank. Kern ist die zuverlässige Koordination individueller Seminaranfragen vom verifizierten Kundenkontakt über Referentenzusagen und Angebote bis zur verbindlichen Terminbestätigung.
 
-Verbindliche technische Vorgaben sind PHP, SQLite, HTML, CSS und JavaScript, mobile Bedienbarkeit, echte serverseitige Funktionen, ein eigenes Verwaltungsbackend, automatisierte Tests und ein reproduzierbarer Serverwechsel. WordPress, ein fertiges CMS, ein allgemeiner Seiteneditor und Onlinezahlung gehören nicht zum Umfang. Bibliotheken für technische Aufgaben bleiben ausdrücklich sinnvoll.
+Verbindliche technische Vorgaben sind PHP, PostgreSQL, HTML, CSS und JavaScript, mobile Bedienbarkeit, echte serverseitige Funktionen, ein eigenes Verwaltungsbackend, automatisierte Tests und ein reproduzierbarer Serverwechsel. WordPress, ein fertiges CMS, ein allgemeiner Seiteneditor und Onlinezahlung gehören nicht zum Umfang. Bibliotheken für technische Aufgaben bleiben ausdrücklich sinnvoll.
 
 Die öffentliche Gestaltung folgt Marineblau, Gold und Weiß sowie festen Seitentypen. Die erwähnten Mockups liegen im Projektordner nicht vor. Es werden deshalb noch keine daraus abgeleiteten Gestaltungsvorgaben behauptet. Die bestehende Website besitzt bereits Themenbereiche und eine Terminseite; deren Inhalte, Datenqualität und Rechte müssen vor einer Übernahme einzeln inventarisiert werden. Die bestehende Terminseite allein belegt kein Modell öffentlicher Einzelplatzbuchungen. [Bestehende Website](https://www.corpsakademie.de/)
 
@@ -24,7 +24,7 @@ Die öffentliche Gestaltung folgt Marineblau, Gold und Weiß sowie festen Seiten
 | Verbindlich | Individuelles Angebot muss vor Buchungsbestätigung angenommen sein | Referentenzusage allein begründet keine kostenpflichtige Kundenbestellung |
 | Verbindlich | Preise werden nicht erfunden | Ohne freigegebene Regel: „Preis auf Anfrage“ |
 | Verbindlich | Newsletter mit gesondertem Double-Opt-in | Buchungsbestätigung ist keine Newslettereinwilligung |
-| Architekturvorschlag | Modularer Monolith, eine aktive Installation, lokale SQLite-Datei | Einfache Portabilität und kurze, gemeinsame Transaktionen |
+| Architekturvorschlag | Modularer Monolith, eine aktive Installation, zentrale PostgreSQL-Datenbank | Gemeinsame, kurze Transaktionen und ein zentral verwalteter Datenspeicher |
 | Architekturvorschlag | Einladungen reservieren noch keinen Referenten; eine gültige Zusage erzeugt eine befristete Belegung | Verhindert, dass eine Anfrage alle angeschriebenen Referenten sperrt; fachlich freizugeben |
 | Offen | Gesamtfrist, Reservierungsdauer, Annahmebedingungen, Stornierungen | Keine automatische verbindliche Buchung, solange diese Regeln fehlen |
 | Offen | Individuelle Gruppenseminare oder zusätzlich feste öffentliche Veranstaltungen mit Einzelplätzen | Vor Buchungsmodell freigeben; Einzelplätze erfordern eine zusätzliche Veranstaltungs- und Kapazitätsverwaltung |
@@ -65,7 +65,7 @@ Die öffentliche Gestaltung folgt Marineblau, Gold und Weiß sowie festen Seiten
 
 Das Dashboard liest die vorhandenen Fachzustände. Es führt keine eigene, abweichende Buchungslogik ein. Offene Zusagen, Eskalationen, Angebotsfreigaben, fehlgeschlagene Nachrichten und überfällige Jobs bleiben unmittelbar erreichbar.
 
-## 3. Bewertung von PHP, SQLite und Hosting
+## 3. Bewertung von PHP, PostgreSQL und Hosting
 
 ### 3.1 Zielstack
 
@@ -76,30 +76,30 @@ Die Anwendung wird ein modularer Monolith mit vier Schichten:
 - **Darstellung:** Controller, HTML-Templates, Formulare und kleine JSON-Endpunkte.
 - **Anwendung:** explizite Anwendungsfälle wie Anfrage aktivieren, Einladung annehmen und Angebot freigeben.
 - **Domäne:** Zustandsautomaten, Fristen, Berechtigungsregeln, Preis- und Verfügbarkeitsregeln.
-- **Infrastruktur:** PDO-SQLite, Dateispeicherung, SMTP, PDF, Queue und Protokollierung.
+- **Infrastruktur:** PDO-PostgreSQL, Dateispeicherung, SMTP, PDF, Queue und Protokollierung.
 
 Geschäftslogik liegt weder in Templates noch in JavaScript. HTTP und CLI rufen dieselben Anwendungsfälle auf. Repositories erhalten für zusammenhängende Änderungen dieselbe Datenbankverbindung. Es gibt keinen zweiten Serverdienst, der Buchungen unabhängig verändert.
 
 Geplant sind Composer und PSR-4, ein schlanker Router, ein Template-System mit automatischem Escaping, bewährte Komponenten für Mail/CLI und eine gepflegte PHP-PDF-Bibliothek. Konkrete Pakete und Versionen werden nach Kompatibilitäts-, Lizenz- und Sicherheitsprüfung festgeschrieben. Beispielsweise kommen Symfony-Komponenten, Twig, Dompdf und PHPUnit infrage. Docker ist für Entwicklung möglich, auf dem Kundenserver aber keine Pflicht. Fertige Releases enthalten die benötigten Produktionsabhängigkeiten und gebaute Assets; Node.js ist keine Voraussetzung im Produktivbetrieb.
 
-### 3.2 SQLite-Eignung
+### 3.2 PostgreSQL-Eignung
 
-Für eine einzelne Plattform mit moderatem Schreibaufkommen ist SQLite eine sinnvolle Wahl. Datenbankdatei, WAL und Shared-Memory-Datei müssen auf einem geeigneten lokalen Dateisystem derselben Maschine liegen. WAL funktioniert nicht als gemeinsam beschreibbare Datenbank über ein Netzwerkdateisystem; gleichzeitig schreibt immer nur eine Verbindung. [SQLite-WAL-Dokumentation](https://www.sqlite.org/wal.html)
+Für eine einzelne Plattform mit moderatem Schreibaufkommen ist ein zentraler PostgreSQL-Server die tragfähige Wahl: Er erlaubt gleichzeitige Schreibverbindungen, echte Zeilensperren und eine serverseitig erzwungene Fremdschlüssel- und Integritätsprüfung. Auf Shared Hosting wird der Server vom Anbieter betrieben; die Anwendung spricht ihn ausschließlich über `APP_DB_HOST`, `APP_DB_PORT`, `APP_DB_NAME`, `APP_DB_USER` und `APP_DB_PASSWORD` aus `shared/.env` an. Zugangsdaten stehen damit nie im Webroot und nie im Git-Repository.
 
-Vorgesehen sind Foreign Keys und Busy Timeout je Verbindung, WAL nach Eignungsprüfung sowie kurze Schreibtransaktionen. Für kritische Abläufe wird zusätzlich die Haltbarkeitseinstellung ausdrücklich festgelegt, vorgeschlagen ist `synchronous=FULL`. Busy-Fehler führen zu begrenzten Wiederholungen ganzer idempotenter Transaktionen mit zufälliger Wartezeit, niemals zu unkontrolliert wiederholten Teiländerungen.
+Vorgesehen sind kurze Transaktionen mit `PDO::beginTransaction`/`commit`, serverseitige Fremdschlüssel und Identity-Spalten sowie Zeilensperren für konkurrierende Vorgänge. Kritische Abläufe serialisieren über `SELECT … FOR UPDATE` beziehungsweise `FOR UPDATE SKIP LOCKED`, nicht über eine Dateisperre. Fehler werden begrenzt und idempotent wiederholt, niemals als unkontrolliert wiederholte Teiländerungen.
 
-**Aktuelle Voraussetzung:** Für WAL wird eine gepflegte SQLite-Version mit behobenem WAL-Reset-Fehler benötigt. Der Fix ist ab 3.51.3 enthalten; ältere Zweige besitzen teilweise Rückportierungen. Vorgeschlagen wird eine aktuelle freigegebene Version ab 3.51.3 unter Ausschluss der zurückgezogenen Version 3.52.0. Entscheidend ist die in PHP tatsächlich geladene Bibliothek, nicht die Version eines separat installierten CLI-Programms. [SQLite-WAL-Fehler](https://www.sqlite.org/wal.html), [Releasehistorie](https://www.sqlite.org/changes.html)
+**Aktuelle Voraussetzung:** PostgreSQL ab Version 10. Identity-Spalten (`GENERATED BY DEFAULT AS IDENTITY`), `jsonb`, `ON CONFLICT … DO UPDATE`, `count(*) FILTER` und `FOR UPDATE SKIP LOCKED` sind ab dieser Version verfügbar. PostgreSQL 10 ist seit November 2022 ohne Herstellersupport; die Anwendung ist so gebaut, dass auch aktuell gepflegte Server ohne Codeänderung genutzt werden können, und produktiv ist ein gepflegter Server vorzuziehen.
 
-Bei Lastproblemen werden zuerst unnötige Schreibvorgänge reduziert, Newsletterbatches begrenzt, Abfragen indexiert und der Host vertikal erweitert. SQLite bleibt die Vorgabe. Ein Wechsel des Datenbanksystems wäre eine neue, ausdrücklich zu entscheidende Architekturänderung.
+Bei Lastproblemen werden zuerst unnötige Schreibvorgänge reduziert, Newsletterbatches begrenzt, Abfragen indexiert und der Host vertikal erweitert. Ein Wechsel des Datenbanksystems wäre eine neue, ausdrücklich zu entscheidende Architekturänderung.
 
 ### 3.3 Verbindliche Hostingprüfung vor Installation
 
 | Prüffeld | Erforderlicher Nachweis |
 |---|---|
 | PHP-Web und PHP-CLI | Unterstützte, kompatible Versionen; identische relevante Erweiterungen |
-| Erweiterungen | PDO_SQLite, mbstring, intl, fileinfo, OpenSSL, Sodium sowie Bild-/XML-Erweiterungen der gewählten Bibliotheken |
-| SQLite | Tatsächlich verwendete Version, Foreign Keys, Transaktionen, WAL-Locking und konsistentes Backup funktionieren |
-| Dateisystem | Lokaler beschreibbarer Bereich außerhalb des Webroots; verlässliches Locking; Platz für WAL, Medien und Backups |
+| Erweiterungen | PDO_PGSQL/PGSQL, mbstring, intl, fileinfo, OpenSSL, Sodium sowie Bild-/XML-Erweiterungen der gewählten Bibliotheken |
+| PostgreSQL | Erreichbare Serverversion ab 10, Identity-Spalten, `jsonb`, Fremdschlüssel und `FOR UPDATE SKIP LOCKED` funktionieren; `pg_dump`/`psql` für Sicherung und Wiederherstellung vorhanden |
+| Dateisystem | Lokaler beschreibbarer Bereich außerhalb des Webroots; verlässliches Locking; Platz für Protokolle, Medien und Sicherungen |
 | Webserver | Nur `public/` öffentlich; Routing, TLS, Sicherheitsheader; alternative sichere Webroot-Konfiguration bei Shared Hosting |
 | Hintergrundjobs | PHP-CLI und zulässiger Cron; Laufzeit-, Prozess- und Speicherlimits bekannt |
 | Versand | TLS-SMTP, erlaubte Absender, Domainauthentifizierung, Versandquoten, Bounce-Zugang |
@@ -110,7 +110,7 @@ Namecheap Shared Hosting erlaubt laut Dokumentation keine Cron-Intervalle unter 
 
 Der dokumentierte Mailrahmen variiert unter anderem von 50 Nachrichten pro Stunde bei Stellar bis zu 200 bei Stellar Plus. Die konkrete Quote wird aus dem gebuchten Produkt übernommen; Transaktionsmails erhalten reservierte Kapazität vor Newslettern. Ein großer Verteiler kann einen separaten SMTP-Anbieter erfordern. Eine Auswahl erfolgt erst nach Festlegung des Volumens. [Namecheap-Versandlimits](https://www.namecheap.com/support/knowledgebase/article.aspx/133/22/do-you-have-any-restrictions-on-sending-out-emails/)
 
-**Bewertung:** PHP/SQLite ist technisch schlüssig. Die Eignung eines konkreten Namecheap-Tarifs bleibt offen, bis diese Prüfung bestanden wurde. Wenn lokale SQLite-Nutzung, CLI oder Fristen nicht tragfähig sind, wird ein kompatibler Hostingtarif oder VPS benötigt.
+**Bewertung:** PHP mit PostgreSQL ist technisch schlüssig. Die Eignung eines konkreten Namecheap-Tarifs bleibt offen, bis diese Prüfung bestanden wurde. Wenn PostgreSQL-Erreichbarkeit, CLI oder Fristen nicht tragfähig sind, wird ein kompatibler Hostingtarif oder VPS benötigt.
 
 ## 4. Gesamtsystem, Datenflüsse und Schnittstellen
 
@@ -123,7 +123,7 @@ flowchart LR
     B --> H
     P --> H
     H --> F[Anwendungsfälle und Domänenregeln]
-    F --> D[(Zentrale SQLite-Datenbank)]
+    F --> D[(Zentrale PostgreSQL-Datenbank)]
     F --> M[Geschützter Medienspeicher]
     C[Cron oder beaufsichtigter CLI-Worker] --> F
     C --> Q[Persistente Jobs und Outbox]
@@ -158,7 +158,7 @@ tests/{Unit,Integration,Concurrency,EndToEnd}/
 docs/                 Architektur und Betriebsanleitungen
 ```
 
-SQLite-Datei, Originaluploads, Angebote, Logs und Backups liegen außerhalb von `public/`. Öffentliche Bildvarianten werden kontrolliert bereitgestellt. Referenten- und Kundendokumente werden nur über berechtigte Downloadendpunkte ausgeliefert.
+Datenbankzugang, Originaluploads, Angebote, Logs und Backups liegen außerhalb von `public/`. Öffentliche Bildvarianten werden kontrolliert bereitgestellt. Referenten- und Kundendokumente werden nur über berechtigte Downloadendpunkte ausgeliefert.
 
 ### 4.2 Schnittstellenkonzept
 
@@ -342,7 +342,7 @@ Zusätzlich gelten folgende Invarianten:
 3. Für Reservierungs- und Buchungsblöcke gibt es höchstens einen Block im Zustand active oder confirmed je Slot und Terminintervall. Die Zuordnung von Slot, Termin und Buchung wird durch zusammengesetzte Referenzen beziehungsweise gezielte Trigger geprüft.
 4. Buchungsstatus, Slots, Einladungen, Kalenderblöcke, Ereignisse und Outbox ändern sich bei kritischen Übergängen gemeinsam in einer Transaktion.
 5. Intervalle sind halboffen: [start, end). Konflikt liegt bei existing_start < requested_end UND existing_end > requested_start vor. Ein angrenzender Termin ist nur ohne zusätzlich konfigurierte Puffer möglich.
-6. Einfache Unique-Indizes verhindern keine beliebigen Zeitüberschneidungen. Diese prüft die Anwendung unter BEGIN IMMEDIATE; Trigger auf Insert und relevante Updates sichern die gleiche Regel zusätzlich ab.
+6. Einfache Unique-Indizes verhindern keine beliebigen Zeitüberschneidungen. Diese prüft die Anwendung in einer Schreibtransaktion mit gesperrten Datensätzen (`SELECT … FOR UPDATE`); Trigger auf Insert und relevante Updates sichern die gleiche Regel zusätzlich ab.
 7. Ein Kalenderblock blockiert, wenn er confirmed ist oder wenn er active und ohne Ablauf beziehungsweise noch nicht abgelaufen ist. Eine temporäre Reservierung braucht immer ein expires_at. Bestätigungen prüfen die tatsächliche Uhrzeit unabhängig von verspäteten Cron-Läufen.
 8. Versionen, Freigaben, Annahmen und versendete Inhaltsstände sind unveränderlich. Änderungen erzeugen neue Versionen, keine Überschreibung historischer Grundlagen.
 9. Angebotssummen, Versionseigentum und veröffentlichungsfähige Inhalte werden serverseitig geprüft. Ein Angebot einer anderen Buchung lässt sich nicht als Annahme verknüpfen.
@@ -371,7 +371,7 @@ Löschjobs prüfen aktive Vorgänge, rechtlich freigegebene Fristen und ausdrüc
 
 ### 5.11 Migrationen
 
-Schemaänderungen sind geordnete, prüfsummengesicherte Migrationen. Vor kritischen Änderungen wird ein konsistentes Backup erstellt und dessen Lesbarkeit geprüft. Aufwendige Änderungen an SQLite-Tabellen erfolgen über kontrolliertes Neuaufbauen mit anschließenden Foreign-Key- und Integritätsprüfungen. Migrationen sind in einer neuen Installation und mit einem realistischen Vorgängerstand zu testen. Eine Rücknahme erfolgt über getestete Rückmigration oder Wiederherstellung mit dem passenden Release, nicht durch beliebiges Austauschen der Datenbankdatei.
+Schemaänderungen sind geordnete, prüfsummengesicherte Migrationen. Vor kritischen Änderungen wird ein konsistentes Backup erstellt und dessen Lesbarkeit geprüft. Aufwendige Änderungen an bestehenden Tabellen erfolgen in einer Transaktion mit anschließenden Fremdschlüssel- und Integritätsprüfungen. Migrationen sind in einer neuen Installation und mit einem realistischen Vorgängerstand zu testen. Eine Rücknahme erfolgt über getestete Rückmigration oder Wiederherstellung mit dem passenden Release, nicht durch beliebiges Austauschen von Daten.
 
 ## 6. Benutzerrollen und Berechtigungen
 
@@ -454,7 +454,7 @@ Modus A erzeugt einen offenen Platz mit allen gemäß Policy geeigneten Kandidat
 Eine Referentenzusage wird folgendermaßen verarbeitet:
 
 1. Login, Datensatzbesitz, Anfrageinhalt und Idempotenz prüfen.
-2. Schreibtransaktion mit BEGIN IMMEDIATE beginnen.
+2. Schreibtransaktion beginnen und die betroffenen Datensätze mit `FOR UPDATE` sperren.
 3. Buchung, Gesamtfrist, Einladung und Platz aus der Datenbank neu lesen.
 4. Kandidatenfreigabe, Pflichtperson, fachliche Eignung und aktive Referentenregistrierung prüfen.
 5. Alle Terminintervalle einschließlich Puffer gegen Verfügbarkeit, Ausnahmen und noch aktive Belegungen prüfen.
@@ -501,7 +501,7 @@ Newsletter-One-Click-Abmeldung ist eine bewusst abweichende, zweckgebundene POST
 
 Kundenkontakte, private Referentendaten, Verfügbarkeitsgründe und Empfängerlisten sind nicht öffentlich. Die öffentliche API liefert nur freie Zeitfenster. Newslettertracking für Öffnungen/Klicks ist nicht vorgesehen, solange kein eigener, ausdrücklich freigegebener Bedarf und Datenverarbeitungskonzept existiert. Externe Schrift-, Analyse- oder Captcha-Dienste werden nicht beiläufig eingebaut.
 
-Einwilligungstext, Version, Bestätigung und Widerruf sind nachweisbar; dabei werden IP-Adressen nicht pauschal unbegrenzt gespeichert. Der Verantwortliche muss die benötigten Nachweisdaten und Fristen festlegen. Auskunft, berechtigter Export, Korrektur, Sperrung und Löschung erhalten administrative Anwendungsfälle. Löschungen berücksichtigen aktive Prozesse und freigegebene Aufbewahrungspflichten. Schutz der Daten auf dem Datenträger beruht zusätzlich auf den Eigenschaften des Hostings und verschlüsselten Backups; normales SQLite bietet allein keine pauschale Verschlüsselung der gesamten Datenbank.
+Einwilligungstext, Version, Bestätigung und Widerruf sind nachweisbar; dabei werden IP-Adressen nicht pauschal unbegrenzt gespeichert. Der Verantwortliche muss die benötigten Nachweisdaten und Fristen festlegen. Auskunft, berechtigter Export, Korrektur, Sperrung und Löschung erhalten administrative Anwendungsfälle. Löschungen berücksichtigen aktive Prozesse und freigegebene Aufbewahrungspflichten. Schutz der Daten auf dem Datenträger beruht zusätzlich auf den Eigenschaften des Hostings und verschlüsselten Backups; der Datenbankserver bietet allein keine pauschale Verschlüsselung der gesamten Datenbank.
 
 ## 9. E-Mail-, Job- und Newsletterautomatisierung
 
@@ -513,7 +513,7 @@ Ein Worker beansprucht fällige Jobs unter einer kurzen Schreibtransaktion, setz
 
 Vor Mailversand wird zusätzlich geprüft: Ist die Nachricht noch erforderlich, das Ziel noch zulässig und der Link noch gültig? Bei abgelaufenen Einladungen entfallen Einladungs- und Erinnerungstexte. Kurz vor dem Versand wird erneut geprüft; eine exakt gleichzeitige Antwort nach dieser letzten Prüfung kann eine bereits übergebene Mail allerdings nicht zurückholen. Der Link bleibt bei Nutzung durch die zentrale Statusprüfung wirkungslos.
 
-Externe Seiteneffekte lassen sich durch eine SQLite-Lease allein nicht nachträglich zurückrollen. Läuft eine Versand-Lease während einer laufenden SMTP-Übertragung aus, darf ein zweiter Worker deshalb nicht blind erneut senden. Der Vorgang wird als unklar behandelt oder über die Idempotenz-/Statusschnittstelle eines geeigneten Providers aufgelöst.
+Externe Seiteneffekte lassen sich durch eine Worker-Lease allein nicht nachträglich zurückrollen. Läuft eine Versand-Lease während einer laufenden SMTP-Übertragung aus, darf ein zweiter Worker deshalb nicht blind erneut senden. Der Vorgang wird als unklar behandelt oder über die Idempotenz-/Statusschnittstelle eines geeigneten Providers aufgelöst.
 
 | Versandzustand | Bedeutung | Weitere Verarbeitung |
 |---|---|---|
@@ -583,13 +583,13 @@ Automatische Bestätigung erfordert gleichzeitig verifizierten Kundenkontakt, fr
 
 Development, Staging und Production besitzen getrennte Datenbanken, Schlüssel, Speicherbereiche, Absenderkonfigurationen und Queue-Läufe. Nichtproduktion nutzt Mail-Sink oder eine strenge Empfänger-Positivliste; ein kopierter Produktionsdatensatz darf keine echten Mails auslösen. Die Betriebsart wird vor dem Start geprüft, nicht nur in der Oberfläche angezeigt.
 
-Der CLI-Installer prüft PHP, Erweiterungen, geladene SQLite-Version, Schreibpfade, Webroot, Locking und Konfiguration, führt Migrationen aus und legt den ersten Superadministrator ohne Defaultpasswort oder Kommandozeilenpasswort an. Er meldet unzureichende Voraussetzungen als Fehler. Datenbank, Uploads und Konfiguration sind über relative Projektbezüge beziehungsweise Umgebungsvariablen austauschbar. TLS- und Mailprüfungen werden durch einen Diagnosebefehl dokumentiert.
+Der CLI-Installer prüft PHP, Erweiterungen, PostgreSQL-Serverversion, Datenbankverbindung, Schreibpfade, Webroot, Locking und Konfiguration, führt Migrationen aus und legt den ersten Superadministrator ohne Defaultpasswort oder Kommandozeilenpasswort an. Er meldet unzureichende Voraussetzungen als Fehler. Datenbank, Uploads und Konfiguration sind über relative Projektbezüge beziehungsweise Umgebungsvariablen austauschbar. TLS- und Mailprüfungen werden durch einen Diagnosebefehl dokumentiert.
 
 Ein versioniertes Release enthält Anwendung, Produktionsabhängigkeiten, Assets, Migrationsstand und Installationsbeschreibung. Laufzeitdaten und Geheimnisse gehören nicht ins Release. Ein Entwicklungscontainer ist optional; die Anwendung verlangt im Produktivbetrieb weder Docker noch einen fremden Hostingdienst.
 
 ### 11.2 Konsistente Backups und Restore
 
-Die Datenbank wird über die SQLite-Backup-API oder ein getestetes VACUUM-INTO-Verfahren konsistent gesichert. Eine einfache Kopie der Hauptdatei bei laufendem WAL-Betrieb ist kein Backupverfahren. Eine Sicherung gilt erst nach erfolgreichem Abschluss und Prüfung als verwendbar. [SQLite-Backup-API](https://www.sqlite.org/backup.html), [VACUUM INTO](https://www.sqlite.org/lang_vacuum.html)
+Die Datenbank wird mit `pg_dump` (Klartextformat) konsistent gesichert und mit `psql` in eine leere Zieldatenbank zurückgespielt. Eine Sicherung gilt erst nach erfolgreichem Abschluss und Prüfung des Integritätsmarkers als verwendbar. [pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html), [psql](https://www.postgresql.org/docs/current/app-psql.html)
 
 Datenbank, referenzierte Medien, notwendige Konfiguration und Versionsmanifest bilden einen wiederherstellbaren Stand. Medien werden unveränderlich unter generierten Schlüsseln gespeichert. Für einen zusammengehörigen Datenbank-/Dateistand werden Änderungen kurz pausiert oder referenzierte Dateiversionen nach dem Datenbanksnapshot vollständig mitgesichert. Hauptschlüssel werden gesondert geschützt gesichert. Backups sind verschlüsselt, nicht öffentlich erreichbar und zusätzlich außerhalb des Anwendungsservers gespeichert.
 
@@ -599,7 +599,7 @@ Vorgeschlagene Betriebsziele sind tägliches Backup, zusätzliche Sicherung vor 
 
 ### 11.3 Geordnete Kundenmigration
 
-1. Zielserver frühzeitig gegen den Hostingvertrag testen; PHP, SQLite, CLI, Locking, SMTP, Speicher und HTTPS dokumentieren.
+1. Zielserver frühzeitig gegen den Hostingvertrag testen; PHP, PostgreSQL-Zugang, CLI, Locking, SMTP, Speicher und HTTPS dokumentieren.
 2. Zielinstallation mit demselben Release und einer geschützten Testkopie erproben. Produktiver Versand bleibt dort gesperrt.
 3. Wartungsfenster vereinbaren. Auf dem alten Server Schreibzugriffe und alle Worker/Cron-Läufe stoppen; laufende Übertragungen abschließen oder als unklar dokumentieren.
 4. Alten Standort technisch gegen erneute Schreibzugriffe und Mailversand sichern. Eine kopierte Datenbank oder ein Lease-Token allein verhindert keine später wieder startenden alten Worker.
@@ -627,7 +627,7 @@ Die Reihenfolge folgt den Abhängigkeiten. Die Darstellung der öffentlichen Web
 | Paket | Ziel und Komponenten | Datenbankänderungen | Sicherheit und erforderliche Tests | Konkrete Abnahme |
 |---|---|---|---|---|
 | 0: Fachliche und technische Freigabe | Umfang, Hostingvertrag, Buchungs- und Preisgrundlagen | Logisches Modell bestätigen; noch keine Migration | Vollständigkeitsprüfung, Hosting-Fragen, verbindliche Regeln von Vorschlägen trennen | Architektur freigegeben; Liste offener Entscheidungen mit zuständiger Person und Freigabezeitpunkt |
-| 1: Ausführbares Fundament | HTTP/CLI, Konfiguration, PDO, Fehler, Zeitdienst, Migrationen, Logging | schema_migrations, system_settings/events, worker_heartbeats; erste Kernreferenzen | Konfigurationsfehler, sichere Pfade, SQLite-Version, FK/WAL und Neuinstallation testen | Leeres System reproduzierbar installierbar; Datenbank und Geheimnisse öffentlich nicht abrufbar |
+| 1: Ausführbares Fundament | HTTP/CLI, Konfiguration, PDO, Fehler, Zeitdienst, Migrationen, Logging | schema_migrations, system_settings/events, worker_heartbeats; erste Kernreferenzen | Konfigurationsfehler, sichere Pfade, PostgreSQL-Version, Fremdschlüssel und Neuinstallation testen | Leeres System reproduzierbar installierbar; Datenbank und Geheimnisse öffentlich nicht abrufbar |
 | 2: Identität und Rechte | Login, Reset, MFA, Sitzungen, Rechte-Policies | users, roles, permissions, Zuordnungen, sessions, MFA, Tokens, Rate-Limits, Audit | Erfolgreicher/fehlgeschlagener Login, Brute Force, Sessionrotation/-ablauf, CSRF, fremder Datensatz, MFA und Recovery | Superadmin und Referent erhalten ausschließlich erlaubten Zugriff; kein Defaultpasswort |
 | 3: Katalog und Referenten | Admin-Assistent, Veröffentlichung, Archive, Profile, Bildverwaltung | Seminare, Kategorien, Zielgruppen, Medien, Versionen, Referenten und Zuordnungen | CRUD und Wiederherstellung, XSS, SQL-Injection, Uploadtyp/-größe, Rechte, Versionskonflikte | Gepflegte Inhalte erscheinen öffentlich; inaktive/archivierte Seminare sind nicht buchbar |
 | 4: Kalender | Regeln, Ausnahmen, Urlaub, Sperren, freie Zeitfenster; mobile Kalenderansichten | availability_rules/exceptions, calendar_blocks | Überschneidungen, Tagesgrenzen, Sommerzeit, mehrtägige Intervalle, Puffer, unzulässige Abwesenheitsänderung | Verfügbarkeit ist für alle Ansichten konsistent; fremde Kalenderdetails bleiben privat |
@@ -643,7 +643,7 @@ Paket 5 benötigt für die erste echte Verifikationsstrecke bereits einen begren
 
 ### 12.1 Teststrategie und Freigabekriterien
 
-Domänenregeln werden mit einer steuerbaren Uhr getestet, damit 24/48/72 Stunden und Gesamtfristen ohne echte Wartezeit geprüft werden. Integrations- und Parallelitätstests nutzen eine echte temporäre SQLite-Datei mit getrennten Verbindungen und Prozessen. Eine reine In-Memory-Datenbank oder ein Mock würde die entscheidenden Dateisperr- und Konkurrenzfälle nicht nachweisen.
+Domänenregeln werden mit einer steuerbaren Uhr getestet, damit 24/48/72 Stunden und Gesamtfristen ohne echte Wartezeit geprüft werden. Integrations- und Parallelitätstests nutzen ein echtes PostgreSQL-Schema mit getrennten Verbindungen und Prozessen. Ein Mock oder ein isolierter Einzelprozess würde die entscheidenden Sperr- und Konkurrenzfälle nicht nachweisen.
 
 Ende-zu-Ende-Tests umfassen mindestens: Seminar suchen → Termin wählen → Anfrage → E-Mail bestätigen → Referent antwortet → Angebot freigeben und annehmen → Termin bestätigen → korrekte Mails und Kalenderblöcke. Weitere Szenarien decken Ablehnung, Ersatz, mehrere Pflichtreferenten, abgelaufene Zusage, Stornierung nach freigegebener Regel und Gesamtfrist ab. Nachrichten gehen dabei an einen Mail-Sink. PDF und HTML-Mails werden zusätzlich visuell geprüft.
 
@@ -655,9 +655,9 @@ Ein Release wird nicht freigegeben, wenn kritische Buchungskonflikte, fehlende B
 
 | Risiko | Bedeutung | Gegenmaßnahme und Nachweis |
 |---|---|---|
-| Ungeprüftes Shared Hosting | Hoch: SQLite-Locking, CLI oder Laufzeiten können ungeeignet sein | Hostingvertrag aus Abschnitt 3 praktisch prüfen; keine Kompatibilitätszusage allein aufgrund „PHP vorhanden“ |
-| SQLite-Schreibkonkurrenz | Hoch: Queue, Newsletter und Buchungen können sich verzögern | Kurze Transaktionen, Indizes, Batches, reservierte Versandkapazität, echter Parallelitäts-/Lasttest |
-| Ungepatchte SQLite-Bibliothek | Hoch: bekannte WAL-Korrekturen können fehlen | Version in PHP prüfen, unterstützten Patchstand verlangen, Installationsfreigabe blockieren |
+| Ungeprüftes Shared Hosting | Hoch: PostgreSQL-Erreichbarkeit, CLI oder Laufzeiten können ungeeignet sein | Hostingvertrag aus Abschnitt 3 praktisch prüfen; keine Kompatibilitätszusage allein aufgrund „PHP vorhanden“ |
+| Sperr- und Schreibkonkurrenz in der Datenbank | Mittel: Queue, Newsletter und Buchungen können sich verzögern | Kurze Transaktionen, Indizes, Batches, reservierte Versandkapazität, echter Parallelitäts-/Lasttest |
+| Veralteter PostgreSQL-Server | Hoch: bekannte Sicherheitslücken bleiben offen | Serverversion bei Installation prüfen, gepflegten Server verlangen, Installationsfreigabe blockieren |
 | Doppelbelegung durch konkurrierende Zusagen | Kritisch | Gemeinsame Schreibtransaktion, bedingte Updates, Unique-Indizes, Trigger, Test mit echten parallelen Prozessen |
 | Undefinierte Reservierungs- oder Bindungsregeln | Kritisch: technisch korrekte Zustände könnten fachlich falsch sein | Policy-Freigabe vor Koordinationsmodul; automatische kostenpflichtige Bestätigung bis dahin deaktiviert |
 | Unklarer SMTP-Abschluss | Hoch: Neuversand kann Duplikate erzeugen, Auslassen kann eine Nachricht verlieren | Ambiguous-Zustand, Providerabgleich oder ausdrückliche Entscheidung; keine fiktive Exactly-once-Zustellung |
@@ -702,7 +702,7 @@ Ein Release wird nicht freigegeben, wenn kritische Buchungskonflikte, fehlende B
 
 ### 14.1 Konkreter Umfang der nächsten Freigabe
 
-Zur Freigabe stehen: modularer PHP-Monolith, zentrale lokale SQLite-Datenbank, drei gemeinsame Oberflächen, das logische relationale Modell, die Transaktions- und Outbox-Strategie sowie die Entwicklungspakete. Als erstes Implementierungspaket ist das ausführbare Fundament mit Konfiguration, Datenbankmigrationen, Tests und Installationsdiagnose vorgesehen; danach Identität und Rechte.
+Zur Freigabe stehen: modularer PHP-Monolith, zentrale PostgreSQL-Datenbank, drei gemeinsame Oberflächen, das logische relationale Modell, die Transaktions- und Outbox-Strategie sowie die Entwicklungspakete. Als erstes Implementierungspaket ist das ausführbare Fundament mit Konfiguration, Datenbankmigrationen, Tests und Installationsdiagnose vorgesehen; danach Identität und Rechte.
 
 Für die nächste fachliche Antwort genügen zunächst die Architekturfreigabe, die Entscheidung zu individuellen Gruppen versus Einzelplätzen und – soweit bereits bekannt – konkreter Hostingtarif sowie Größenordnung des Betriebs. Die übrigen Entscheidungen bleiben sichtbar und werden vor dem jeweils abhängigen Modul verbindlich eingeholt. Bis zu dieser Freigabe wird keine Anwendung programmiert und nichts veröffentlicht.
 
@@ -712,7 +712,7 @@ Für die nächste fachliche Antwort genügen zunächst die Architekturfreigabe, 
 |---|---|
 | 1 Anforderungen interpretieren | Abschnitt 1 |
 | 2 Geplante Module | Abschnitt 2 |
-| 3 PHP/SQLite/Hosting bewerten | Abschnitt 3 |
+| 3 PHP/PostgreSQL/Hosting bewerten | Abschnitt 3 |
 | 4 Komponenten und Datenflüsse | Abschnitt 4 |
 | 5 Vollständiges logisches Datenbankmodell | Abschnitt 5 |
 | 6 Rollen und Berechtigungen | Abschnitt 6 |

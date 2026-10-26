@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace Corpsakademie\Infrastructure;
 
-/** SQLite persistence for the identity aggregate; no password/token policy here. */
+/** PostgreSQL persistence for the identity aggregate; no password/token policy here. */
 final class IdentityRepository
 {
     public function __construct(private readonly Database $db) {}
@@ -13,10 +13,9 @@ final class IdentityRepository
 
     public function insertUser(string $publicId,string $email,string $emailKey,string $name,string $hash,?int $verified,int $now): int
     {
-        $this->db->run('INSERT INTO users(public_id,email,email_key,name,password_hash,status,email_verified_at,password_changed_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',[
+        return (int)$this->db->run('INSERT INTO users(public_id,email,email_key,name,password_hash,status,email_verified_at,password_changed_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) RETURNING id',[
             $publicId,$email,$emailKey,$name,$hash,'active',$verified,$now,$now,$now,
-        ]);
-        return (int)$this->db->pdo->lastInsertId();
+        ])->fetchColumn();
     }
 
     public function addRole(int $id,string $role): void
@@ -74,18 +73,18 @@ final class IdentityRepository
 
     public function revokePurposeTokens(string $purpose,?int $userId,int $now): void
     {
-        $this->db->run('UPDATE email_verification_tokens SET revoked_at=? WHERE purpose=? AND user_id IS ? AND consumed_at IS NULL AND revoked_at IS NULL',[$now,$purpose,$userId]);
+        $this->db->run('UPDATE email_verification_tokens SET revoked_at=? WHERE purpose=? AND user_id IS NOT DISTINCT FROM ? AND consumed_at IS NULL AND revoked_at IS NULL',[$now,$purpose,$userId]);
     }
 
     public function insertToken(string $purpose,string $hash,?int $userId,int $expiry,int $now): int
     {
-        $this->db->run('INSERT INTO email_verification_tokens(purpose,token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?,?)',[$purpose,$hash,$userId,$expiry,$now]);
-        return (int)$this->db->pdo->lastInsertId();
+        return (int)$this->db->run('INSERT INTO email_verification_tokens(purpose,token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?,?) RETURNING id',[$purpose,$hash,$userId,$expiry,$now])->fetchColumn();
     }
 
     public function validToken(string $purpose,string $hash,int $now): ?array
     {
-        return $this->db->one('SELECT * FROM email_verification_tokens WHERE purpose=? AND token_hash=? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at>?',[$purpose,$hash,$now]);
+        // FOR UPDATE serialisiert konkurrierende Einlösungen; der Aufruf erfolgt ausschließlich in einer Schreibtransaktion.
+        return $this->db->one('SELECT * FROM email_verification_tokens WHERE purpose=? AND token_hash=? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at>? FOR UPDATE',[$purpose,$hash,$now]);
     }
 
     public function consumeToken(int $id,int $now): void { $this->db->run('UPDATE email_verification_tokens SET consumed_at=? WHERE id=? AND consumed_at IS NULL',[$now,$id]); }
@@ -115,7 +114,7 @@ final class IdentityRepository
 
     public function revokeSessions(int $userId,int $now,?string $exceptHash=null): void
     {
-        $this->db->run('UPDATE sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL AND session_hash IS NOT ?',[$now,$userId,$exceptHash]);
+        $this->db->run('UPDATE sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL AND session_hash IS DISTINCT FROM ?',[$now,$userId,$exceptHash]);
     }
 
     public function activeSession(string $hash,int $now): ?array
@@ -125,7 +124,7 @@ final class IdentityRepository
 
     public function touchSession(int $id,int $now,int $idleExpiry): void
     {
-        $this->db->run('UPDATE sessions SET last_seen_at=?,idle_expires_at=min(absolute_expires_at,?) WHERE id=? AND revoked_at IS NULL',[$now,$idleExpiry,$id]);
+        $this->db->run('UPDATE sessions SET last_seen_at=?,idle_expires_at=LEAST(absolute_expires_at,?) WHERE id=? AND revoked_at IS NULL',[$now,$idleExpiry,$id]);
     }
 
     public function revokeSession(string $hash,int $now): void { $this->db->run('UPDATE sessions SET revoked_at=? WHERE session_hash=? AND revoked_at IS NULL',[$now,$hash]); }
@@ -140,11 +139,11 @@ final class IdentityRepository
 
     public function overview(): array
     {
-        return $this->db->run("SELECT u.public_id,u.name,u.email,u.status,u.email_verified_at,group_concat(r.label, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id GROUP BY u.id ORDER BY u.created_at DESC,u.id DESC LIMIT 100")->fetchAll();
+        return $this->db->run("SELECT u.public_id,u.name,u.email,u.status,u.email_verified_at,string_agg(r.label, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id GROUP BY u.id ORDER BY u.created_at DESC,u.id DESC LIMIT 100")->fetchAll();
     }
 
     public function statistics(): array
     {
-        return $this->db->one("SELECT count(*) AS total,sum(status='active') AS active,sum(email_verified_at IS NOT NULL) AS verified FROM users");
+        return $this->db->one("SELECT count(*) AS total,count(*) FILTER (WHERE status='active') AS active,count(*) FILTER (WHERE email_verified_at IS NOT NULL) AS verified FROM users");
     }
 }

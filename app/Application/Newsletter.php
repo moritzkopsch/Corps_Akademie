@@ -15,7 +15,7 @@ final class Newsletter
     public function overview(int $actor): array
     {
         $this->authorize($actor);
-        return ['campaigns'=>$this->db->run("SELECT c.*,COUNT(d.id) AS recipients,SUM(d.state='submitted') AS submitted,SUM(d.state='queued') AS waiting,SUM(d.state='ambiguous') AS ambiguous FROM newsletter_campaigns c LEFT JOIN newsletter_deliveries d ON d.campaign_id=c.id GROUP BY c.id ORDER BY c.id DESC LIMIT 100")->fetchAll(),
+        return ['campaigns'=>$this->db->run("SELECT c.*,COUNT(d.id) AS recipients,COUNT(*) FILTER (WHERE d.state='submitted') AS submitted,COUNT(*) FILTER (WHERE d.state='queued') AS waiting,COUNT(*) FILTER (WHERE d.state='ambiguous') AS ambiguous FROM newsletter_campaigns c LEFT JOIN newsletter_deliveries d ON d.campaign_id=c.id GROUP BY c.id ORDER BY c.id DESC LIMIT 100")->fetchAll(),
             'active'=>(int)$this->db->run("SELECT COUNT(*) FROM newsletter_subscribers WHERE state='active'")->fetchColumn()];
     }
 
@@ -32,8 +32,7 @@ final class Newsletter
         return $this->db->immediate(function() use ($actor,$values,$id,$subject,$body): int {
             $this->authorize($actor); $now=$this->clock->now()->getTimestamp();
             if ($id===null) {
-                $this->db->run("INSERT INTO newsletter_campaigns(subject,body,state,created_by,created_at,updated_at) VALUES(?,?,'draft',?,?,?)",[$subject,$body,$actor,$now,$now]);
-                $id=(int)$this->db->pdo->lastInsertId();
+                $id=(int)$this->db->run("INSERT INTO newsletter_campaigns(subject,body,state,created_by,created_at,updated_at) VALUES(?,?,'draft',?,?,?) RETURNING id",[$subject,$body,$actor,$now,$now])->fetchColumn();
             } else {
                 $count=$this->db->run("UPDATE newsletter_campaigns SET subject=?,body=?,row_version=row_version+1,updated_at=? WHERE id=? AND state='draft' AND row_version=?",[$subject,$body,$now,$id,$values['row_version']??''])->rowCount();
                 if ($count!==1) { throw new \DomainException('Dieser Entwurf wurde geändert oder bereits freigegeben. Bitte neu laden.'); }
