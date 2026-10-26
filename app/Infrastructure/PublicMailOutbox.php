@@ -41,7 +41,7 @@ final class PublicMailOutbox
             if ($this->config->environment!=='production' && !str_ends_with(mb_strtolower($row['recipient']),'@example.test')) { $results[$this->finish($row,'blocked')]++; continue; }
             try {
                 $payload=json_decode($this->crypto->decrypt($row['payload_ciphertext'],'public-mail',$row['key_id']),true,512,JSON_THROW_ON_ERROR);
-                $message=(new Email())->from($this->config->mailFrom)->to($row['recipient'])->subject('Corpsakademie · '.$payload['subject'])->text($payload['text']);
+                $message=(new Email())->from($this->config->mailFrom)->replyTo($this->config->mailReplyTo)->to($row['recipient'])->subject('Corpsakademie · '.$payload['subject'])->text($payload['text']);
                 $message->getHeaders()->addIdHeader('Message-ID',$row['message_id']);
                 if ($this->db->one("SELECT id FROM public_mail_outbox WHERE id=? AND status='sending' AND lease_token=? AND lease_until>?",[$row['id'],$row['lease_token'],$this->clock->now()->getTimestamp()])===null) { $results[$this->finish($row,'ambiguous')]++; continue; }
                 $this->mailer->send($message);

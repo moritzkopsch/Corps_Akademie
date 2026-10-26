@@ -70,6 +70,9 @@ final class PublicRequests
             $this->store->activateInquiry((int)$row['inquiry_id'],$now);
             $inquiry=$this->store->inquiryById((int)$row['inquiry_id']);
             $this->mail->enqueue('inquiry-received:'.$row['inquiry_id'],$inquiry['email'],'Ihre Anfrage ist eingegangen',"Vielen Dank. Ihre E-Mail-Adresse ist bestätigt und Ihre Anfrage liegt der Corpsakademie zur Prüfung vor.\n\nTermin, Referenten und Konditionen werden gesondert abgestimmt. Diese Nachricht ist keine verbindliche Buchungsbestätigung.");
+            if ($this->config->mailContactTo!=='') {
+                $this->mail->enqueue('inquiry-notify:'.$row['inquiry_id'],$this->config->mailContactTo,'Neue bestätigte Anfrage',"Eine neue bestätigte Anfrage liegt in der geschützten Verwaltung vor:\n\n".$this->config->url.'/admin/anfragen/'.$inquiry['public_id']);
+            }
             $this->audit->record('inquiry.verified',null,$inquiry['public_id'],[],'inquiry');
         });
     }
@@ -105,7 +108,10 @@ final class PublicRequests
     {
         if (!$this->limits->attempt('public.consume.ip',$ip,20,900)) { throw new \DomainException('Bitte versuchen Sie es später erneut.'); }
         $this->db->immediate(function() use ($token): void {
-            $now=$this->clock->now()->getTimestamp(); $row=$this->store->consume('newsletter_unsubscribe',$token,$now);
+            $now=$this->clock->now()->getTimestamp();
+            if (!preg_match('/^[A-Za-z0-9_-]{43}$/D',$token)) { throw new \DomainException('Dieser Link ist ungültig.'); }
+            $row=$this->db->one("SELECT subscriber_id FROM newsletter_deliveries WHERE unsubscribe_hash=? AND state IN ('sending','submitted','ambiguous')",[Crypto::hash($token)]);
+            $row??=$this->store->consume('newsletter_unsubscribe',$token,$now);
             $this->store->unsubscribe((int)$row['subscriber_id'],$now);
             $this->audit->record('newsletter.unsubscribed',null,(string)$row['subscriber_id'],[],'subscriber');
         });

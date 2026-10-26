@@ -185,6 +185,7 @@ final class Application
                 return $this->form('mfa',$session,$values);
             }
             if (!$this->isAuthenticated($session)) { return new RedirectResponse($this->destination($session),303); }
+            if (str_starts_with($path,'/admin/newsletter')) { return (new NewsletterAdmin($this->c,$this->view(...)))->handle($request,$session,$user); }
             $content = $website->admin($request,$session,$user);
             if ($content !== null) { return $content; }
             if ($path === '/sicherheit/wiederherstellung') {

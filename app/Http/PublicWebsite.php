@@ -16,6 +16,7 @@ final class PublicWebsite
         if (in_array($path,['/anfrage','/kontakt','/newsletter','/anfrage/bestaetigen','/newsletter/bestaetigen','/newsletter/abmelden'],true)) { return ['GET','POST']; }
         if (preg_match('~^/(seminare|referenten)/[a-z0-9]+(?:-[a-z0-9]+)*$~D',$path)) { return ['GET']; }
         if (preg_match('~^/admin/(seminare|referenten)(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?$~D',$path)) { return ['GET','POST']; }
+        if (preg_match('~^/admin/newsletter(?:/(?:neu|[1-9][0-9]{0,9}))?$~D',$path)) { return ['GET','POST']; }
         if (preg_match('~^/admin/anfragen(?:/[A-Za-z0-9_-]{43})?$~D',$path)) { return ['GET','POST']; }
         return null;
     }

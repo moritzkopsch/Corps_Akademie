@@ -18,6 +18,10 @@ final class Config
     public readonly string $mailerDsn;
     public readonly string $mailFrom;
     public readonly bool $mailEnabled;
+    public readonly string $newsletterFrom;
+    public readonly string $newsletterDsn;
+    public readonly string $mailReplyTo;
+    public readonly string $mailContactTo;
 
     public function __construct(public readonly string $root, array $values)
     {
@@ -59,16 +63,29 @@ final class Config
         $this->mailEnabled=$mailEnabled;
         $this->mailerDsn = (string) ($values['MAILER_DSN'] ?? '');
         $this->mailFrom = (string) ($values['MAIL_FROM'] ?? '');
+        $this->newsletterFrom=(string)($values['NEWSLETTER_MAIL_FROM']??$this->mailFrom);
+        $this->newsletterDsn=(string)($values['NEWSLETTER_MAILER_DSN']??$this->mailerDsn);
+        $this->mailReplyTo=(string)($values['MAIL_REPLY_TO']??$this->mailFrom);
+        $this->mailContactTo=(string)($values['MAIL_CONTACT_TO']??'');
         if (!$this->mailEnabled) { return; }
+        foreach ([$this->newsletterFrom,$this->mailReplyTo,...($this->mailContactTo===''?[]:[$this->mailContactTo])] as $address) {
+            if (filter_var($address,FILTER_VALIDATE_EMAIL)===false) { throw new \RuntimeException('Newsletter-Absender oder Antwortadresse ist ungültig.'); }
+        }
+        $this->validateDsn($this->newsletterDsn);
         if (filter_var($this->mailFrom, FILTER_VALIDATE_EMAIL) === false) {
             throw new \RuntimeException('MAIL_FROM ist ungültig.');
         }
+        $this->validateDsn($this->mailerDsn);
+    }
+
+    private function validateDsn(string $mailerDsn): void
+    {
         if ($this->environment !== 'production'
-            && !preg_match('~^smtp://(?:127\.0\.0\.1|localhost):1025$~D', $this->mailerDsn)) {
+            && !preg_match('~^smtp://(?:127\.0\.0\.1|localhost):1025$~D', $mailerDsn)) {
             throw new \RuntimeException('Nichtproduktion verwendet ausschließlich den lokalen SMTP-Testserver.');
         }
         if ($this->environment === 'production') {
-            $dsn = parse_url($this->mailerDsn);
+            $dsn = parse_url($mailerDsn);
             if ($dsn === false || !in_array($dsn['scheme'] ?? '', ['smtp', 'smtps'], true) || empty($dsn['host'])) {
                 throw new \RuntimeException('Ein gültiger SMTP-Versandweg ist erforderlich.');
             }

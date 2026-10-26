@@ -38,7 +38,7 @@ Der Helfer sucht ein freigegebenes CLI-PHP. Bei Bedarf einen bestätigten PHP-Pf
 Nach erfolgreicher Bereitstellung mit dem bestätigten PHP-Interpreter den stabilen Wrapper verwenden:
 
 ```bash
-/ABSOLUTER/PFAD/ZUM/php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --base=/home/pushgobt/corps-akademie.r4av.com setup:link
+/usr/local/bin/php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --base=/home/pushgobt/corps-akademie.r4av.com setup:link
 ```
 
 Für Konto-/Anfrage-/Newsletter-Bestätigungsmails einen Cronjob mit demselben Wrapper und `mail:work --limit=4` einrichten. Auf Shared Hosting mindestens fünf Minuten Abstand einhalten und die zum Tarif gehörige Versandquote berücksichtigen; kleinere Stapel gegebenenfalls weiter begrenzen. Keine parallelen direkten `bin/console mail:work`-Läufe verwenden, da diese die Deployment-Sperre umgehen würden. Der lokale `mail:watch` ist nicht für den Server vorgesehen.
@@ -77,7 +77,7 @@ Die private `.env`, Datenbank und Admin-Inhalte bleiben bei diesen Aktualisierun
 
 - Ein echtes Absenderpostfach und SMTP-Zugang einrichten; Zugangsdaten ausschließlich in der privaten `shared/.env` hinterlegen.
 - `MAILER_DSN`, `MAIL_FROM` und anschließend `APP_MAIL_ENABLED=true` setzen. Keine Zugangsdaten oder APP_KEY in Git speichern.
-- Den Mailworker als cPanel-Cronjob einrichten und echte Zustellung, Bestätigungslinks und Abmeldung prüfen. Der Mailworker verarbeitet Bestätigungsmails; dies ersetzt keine vollständige Newsletter-Kampagnenverwaltung.
+- Den Mailworker als cPanel-Cronjob einrichten und echte Zustellung, Bestätigungslinks und Abmeldung prüfen. Der Mailworker verarbeitet Bestätigungsmails; freigegebene Rundmails verarbeitet der separate Newsletter-Worker (siehe unten).
 - Mit dem Wrapper `setup:link` ausführen, den ersten Administrator über den erzeugten Link einrichten und die erforderliche Mehrfaktor-Anmeldung abschließen.
 - Anfrage- und Newsletter-Abläufe sowie Admin-Bearbeitung und Seminar-Sichtbarkeit auf dem Server abnehmen.
 - Seminarangaben, Referentenprofile und Bildfreigaben sowie Impressum und Datenschutz verbindlich freigeben. Die Website ist derzeit eine Präsentation und noch keine vollständig abgenommene Kundeninstallation.
@@ -90,3 +90,48 @@ php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --
 ```
 
 Der verwendete CLI-PHP-Interpreter muss die oben genannten Anforderungen erfüllen. Beim ersten Deployment funktionierte das Standardkommando `php` mit PHP 8.5.12 und den aktivierten Erweiterungen. Bei Cronjobs den bestätigten absoluten Interpreterpfad verwenden und dessen Erweiterungen ebenfalls prüfen.
+
+## Mail und Rundmails: Einrichtung für corps-akademie.r4av.com
+
+Die Postfächer `info@corps-akademie.r4av.com`, `system@corps-akademie.r4av.com` und `newsletter@corps-akademie.r4av.com` sind in cPanel vorhanden. Die früher genannten Adressen unter `verbindung.r4av.com` werden nicht verwendet.
+
+- `system@` authentifiziert den Versand automatischer Bestätigungs- und Kontomails.
+- `newsletter@` verwendet einen eigenen SMTP-Zugang für freigegebene Rundmails.
+- Antworten und Benachrichtigungen über bestätigte Kontakt-/Seminaranfragen gehen an `info@`.
+
+Nach Deployment interaktiv im cPanel-Terminal ausführen:
+
+```bash
+php /home/pushgobt/corps-akademie.r4av.com/current/scripts/configure-cpanel-mail.php
+```
+
+Der Betreiber gibt dort die bestehenden Postfachpasswörter für `system@` und `newsletter@` ein. Sie erscheinen nicht auf dem Bildschirm und gehören weder in den Chat noch in Shellargumente oder Git. Das Skript prüft beide SMTP-Anmeldungen über TLS auf `premium323.web-hosting.com:465`, ohne E-Mails zu versenden. Erst nach erfolgreicher Prüfung speichert es die private Konfiguration atomar und aktiviert den Mailversand. Die vorherige Konfiguration wird privat gesichert. APP_KEY und Datenbank bleiben erhalten. Bei einer Fehlermeldung werden keine SMTP-Dialoge oder Zugangsdaten ausgegeben.
+
+SMTP-Anmeldung allein bestätigt noch keine Zustellung: Anschließend eine eigene Testadresse für Anmeldung, Bestätigungslink, Anfrage, Antwortadresse und Abmeldung verwenden und SPF/DKIM in **Email Deliverability** prüfen. Es wurden durch die Einrichtung keine Rundmails versendet.
+
+### Newsletter-Verwaltung
+
+Nach Admin-Anmeldung einschließlich MFA: `/admin/newsletter`.
+
+1. Eine Rundmail als Entwurf anlegen und speichern.
+2. Die gespeicherte Textvorschau kontrollieren. Abmelde- und Impressumslink werden pro Empfänger ergänzt.
+3. Versand ausdrücklich freigeben. Empfänger sind ausschließlich die zu diesem Zeitpunkt bestätigten Abonnenten. Spätere Anmeldungen werden nicht nachträglich aufgenommen.
+4. Der Worker prüft vor dem Versand erneut, ob die Anmeldung noch aktiv und unverändert ist. Gestoppte Kampagnen und Abmeldungen verhindern ausstehende Sendungen; bereits übertragene oder gerade übermittelte Nachrichten sind nicht rückrufbar.
+5. Den Status kontrollieren. „An SMTP übergeben“ bedeutet keine garantierte Postfachzustellung. Unklare SMTP-Ausgänge werden nicht automatisch erneut versendet, um Doppelversand zu verhindern.
+
+Einmal freigegebene Texte sind unveränderlich. Die Verwaltung ist auf Adminrollen beschränkt und verwendet die vorhandenen MFA-/CSRF-Prüfungen. Empfängeradressen werden einzeln adressiert, nicht als offener Gruppenverteiler. Newsletter werden als Textmails ohne Öffnungstracking versendet. Es gibt keinen automatischen Import fremder Adresslisten und keine automatische Rundmail ohne Freigabe.
+
+### Cronjobs
+
+Den auf dem Server bestätigten absoluten PHP-Pfad `/usr/local/bin/php` verwenden. Nicht den unvollständig konfigurierten Alt-PHP-Pfad hart verdrahten.
+
+Alle fünf Minuten für Bestätigungsmails, zeitlich versetzt für Rundmails:
+
+```text
+*/5 * * * * /usr/local/bin/php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --base=/home/pushgobt/corps-akademie.r4av.com mail:work --limit=3 --if-enabled
+1-59/5 * * * * /usr/local/bin/php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --base=/home/pushgobt/corps-akademie.r4av.com newsletter:work --limit=1 --if-enabled
+```
+
+`--if-enabled` beendet den Lauf bei abgeschaltetem Mailversand ohne Fehler. Der Newsletter-Worker begrenzt in Produktion zusätzlich datenbankgestützt auf höchstens einen Versandversuch je fünf Minuten, auch bei parallel gestarteten Workern. Zusammen mit diesen Cronjobs sind zunächst bis zu 36 Bestätigungsmails und 12 Rundmails pro Stunde vorgesehen; manuelle zusätzliche Bestätigungsworker und sonstiger Postfachversand können das Domainkontingent zusätzlich belasten.
+
+Die tatsächliche Tarifquote muss vor einer Erhöhung geprüft werden. Namecheap nennt je nach Paket unterschiedliche Grenzen: https://www.namecheap.com/legal/hosting/aup/ . Zustellbarkeit/SPF/DKIM: https://docs.cpanel.net/cpanel/email/email-deliverability-in-cpanel/ . Große Verteiler benötigen eine gesonderte Kapazitätsplanung; die konservative Grundeinstellung ist für den Start gedacht.

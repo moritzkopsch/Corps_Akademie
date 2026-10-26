@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace Corpsakademie;
 
-use Corpsakademie\Application\{AccountLinks,Catalog,PublicRequests};
+use Corpsakademie\Application\{AccountLinks,Catalog,Newsletter,PublicRequests};
 use Corpsakademie\Domain\Identity\{Accounts,Authentication,Mfa,RateLimiter,Tokens};
 use Corpsakademie\Http\SessionStore;
 use Corpsakademie\Infrastructure\{Audit,CatalogRepository,Config,Crypto,Database,DisabledMailer,IdentityRepository,InquiryRepository,MailOutbox,PublicMailOutbox,SystemClock};
@@ -29,6 +29,7 @@ final class Container
     public readonly Catalog $content;
     public readonly PublicMailOutbox $publicMail;
     public readonly PublicRequests $publicRequests;
+    public readonly Newsletter $newsletter;
 
     public function __construct(public readonly Config $config, ?ClockInterface $clock = null, ?MailerInterface $mailer = null)
     {
@@ -49,6 +50,13 @@ final class Container
             if ($transport instanceof SmtpTransport) { $transport->getStream()->setTimeout(10); }
             $mailer = new Mailer($transport);
         }
+        $newsletterMailer=$mailer;
+        if ($config->mailEnabled && $config->newsletterDsn!==$config->mailerDsn) {
+            $newsletterTransport=Transport::fromDsn($config->newsletterDsn);
+            if ($newsletterTransport instanceof SmtpTransport) { $newsletterTransport->getStream()->setTimeout(10); }
+            $newsletterMailer=new Mailer($newsletterTransport);
+        }
+        $this->newsletter=new Newsletter($this->db,$config,$this->crypto,$this->accounts,$this->audit,$this->clock,$newsletterMailer);
         $this->mail = new MailOutbox($this->db,$config,$this->crypto,$this->clock,$mailer);
         $this->links = new AccountLinks($this->db,$this->accounts,$this->tokens,$this->mail,$this->limits,$this->audit,$config,$this->clock,$this->identity);
         $this->catalog = new CatalogRepository($this->db);
