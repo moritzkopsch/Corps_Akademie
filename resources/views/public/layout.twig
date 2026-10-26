@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-{% if is_local %}<meta name="robots" content="noindex, nofollow">{% endif %}
+{% if is_local or not mail_enabled %}<meta name="robots" content="noindex, nofollow">{% endif %}
 <meta name="description" content="{{ meta_description }}">
 <title>{% block title %}Bildung, die verbindet{% endblock %} · Corpsakademie</title>
 <link rel="icon" href="/assets/brand.svg" type="image/svg+xml">
@@ -20,6 +20,7 @@
 {% for href,label in {'/seminare':'Seminare','/termine':'Termine','/ueber-uns':'Über uns','/referenten':'Referenten','/kontakt':'Kontakt'} %}<a href="{{ href }}" {% if path == href or path starts with href ~ '/' %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
 <a class="button button-small" href="/anfrage">Seminar anfragen <span aria-hidden="true">↗</span></a>
 </nav></div></header>
+{% if not mail_enabled %}<div class="runtime-note"><div class="wrap">Die Website ist online. Online-Anfragen und Newsletter folgen nach Einrichtung des Mailversands.</div></div>{% endif %}
 <main id="inhalt" tabindex="-1">{% block content %}{% endblock %}</main>
 {% block bottom_cta %}<section class="closing"><div class="wrap closing-inner"><div><p class="eyebrow">GEMEINSAM DEN NÄCHSTEN SCHRITT GEHEN</p><h2>Welches Thema bewegt Ihr Corps?</h2><p>Wir unterstützen Sie dabei, das passende Seminar für Ihre Gemeinschaft zu finden.</p></div><a class="button button-gold" href="/anfrage">Seminar unverbindlich anfragen <span aria-hidden="true">↗</span></a></div></section>{% endblock %}
 <footer class="public-footer"><div class="wrap footer-grid">

@@ -4,9 +4,9 @@ namespace Corpsakademie\Infrastructure;
 
 final class CatalogSeeder
 {
-    public static function seed(Database $db, CatalogRepository $catalog, string $root, int $now): array
+    public static function seed(Database $db, CatalogRepository $catalog, string $root, int $now, bool $presentation = false): array
     {
-        if (!in_array($db->config->environment,['local','test'],true)) { throw new \RuntimeException('Präsentationsinhalte dürfen nur lokal oder in Tests eingespielt werden.'); }
+        if (!in_array($db->config->environment,['local','test'],true) && !($presentation && !$db->config->mailEnabled)) { throw new \RuntimeException('Präsentationsinhalte sind nur lokal/in Tests oder ausdrücklich mit --presentation bei deaktiviertem Mailversand erlaubt.'); }
         $content=require $root.'/resources/content/catalog.php';
         return $db->immediate(function() use ($db,$catalog,$content,$now): array {
             $counts=['seminars'=>0,'referents'=>0];

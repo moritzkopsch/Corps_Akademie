@@ -89,6 +89,9 @@ final class Application
             $website = new PublicWebsite($this->c,$this->view(...));
             $public = $website->public($request,$session,$ip);
             if ($public !== null) { return $public; }
+            if (!$this->c->config->mailEnabled && in_array($path,['/einrichten','/passwort-vergessen','/email-bestaetigung'],true)) {
+                return $this->error(503,'E-Mail-Versand wird eingerichtet','Kontoeinrichtung und Wiederherstellung werden nach Einrichtung des E-Mail-Versands freigeschaltet.',$session);
+            }
             if ($path === '/abmelden') {
                 if ($session->userId !== null) { $this->c->audit->record('session.logout',$session->userId); }
                 $session = $this->c->sessions->rotate($session,null);
@@ -279,6 +282,7 @@ final class Application
             'can_admin'=>$full && $this->c->accounts->can((int)$user['id'],'admin.access'),
             'can_portal'=>$full && $this->c->accounts->can((int)$user['id'],'portal.access'),
             'is_local'=>$this->c->config->environment!=='production',
+            'mail_enabled'=>$this->c->config->mailEnabled,
         ],$context)),$status,['Content-Type'=>'text/html; charset=UTF-8']);
     }
 

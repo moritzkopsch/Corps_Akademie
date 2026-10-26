@@ -12,6 +12,7 @@ final class MailOutbox
 
     public function enqueue(string $kind, array $user, array $token): void
     {
+        if (!$this->config->mailEnabled) { throw new \DomainException('Der E-Mail-Versand ist noch nicht eingerichtet.'); }
         if (!$this->db->inTransaction()) { throw new \LogicException('Mailauftrag benötigt eine fachliche Transaktion.'); }
         $path = $kind === 'password_reset' ? '/passwort-neu' : '/email-bestaetigen';
         $link = $this->config->url . $path . '#token=' . $token['token'];
@@ -25,6 +26,7 @@ final class MailOutbox
 
     public function work(int $limit = 10): array
     {
+        if (!$this->config->mailEnabled) { throw new \DomainException('Der E-Mail-Versand ist deaktiviert. Es wurden keine Nachrichten versendet.'); }
         if ($this->db->inTransaction()) { throw new \LogicException('Kein SMTP-Versand innerhalb einer Transaktion.'); }
         $results = ['submitted'=>0,'cancelled'=>0,'ambiguous'=>0,'blocked'=>0];
         for ($i=0; $i<$limit; $i++) {

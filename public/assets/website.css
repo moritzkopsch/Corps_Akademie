@@ -2074,3 +2074,11 @@ svg {
     transition:none!important
   }
 }
+.runtime-note {
+  background: var(--cream);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  padding: 10px 0;
+  font-size: .75rem;
+  line-height: 1.6;
+}

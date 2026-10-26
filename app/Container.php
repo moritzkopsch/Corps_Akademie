@@ -5,7 +5,7 @@ namespace Corpsakademie;
 use Corpsakademie\Application\{AccountLinks,Catalog,PublicRequests};
 use Corpsakademie\Domain\Identity\{Accounts,Authentication,Mfa,RateLimiter,Tokens};
 use Corpsakademie\Http\SessionStore;
-use Corpsakademie\Infrastructure\{Audit,CatalogRepository,Config,Crypto,Database,IdentityRepository,InquiryRepository,MailOutbox,PublicMailOutbox,SystemClock};
+use Corpsakademie\Infrastructure\{Audit,CatalogRepository,Config,Crypto,Database,DisabledMailer,IdentityRepository,InquiryRepository,MailOutbox,PublicMailOutbox,SystemClock};
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Mailer\{Mailer,MailerInterface,Transport};
 use Symfony\Component\Mailer\Transport\Smtp\SmtpTransport;
@@ -43,6 +43,7 @@ final class Container
         $this->tokens = new Tokens($this->db,$this->clock,$this->identity);
         $this->mfa = new Mfa($this->db,$this->crypto,$config,$this->clock,$this->audit,$this->identity);
         $this->auth = new Authentication($this->accounts,$this->limits,$this->audit,$this->crypto,$this->db,$this->sessions,$this->identity);
+        if (!$config->mailEnabled) { $mailer=new DisabledMailer(); }
         if ($mailer === null) {
             $transport = Transport::fromDsn($config->mailerDsn);
             if ($transport instanceof SmtpTransport) { $transport->getStream()->setTimeout(10); }

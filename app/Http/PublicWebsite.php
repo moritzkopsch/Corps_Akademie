@@ -44,6 +44,9 @@ final class PublicWebsite
             return $show('referent.twig',['referent'=>$referent,'seminars'=>$seminars]);
         }
         if (in_array($path,['/ueber-uns','/faq','/termine','/impressum','/datenschutz'],true)) { return $show('information.twig',['page'=>substr($path,1),'seminars'=>$path==='/termine'?$this->c->catalog->seminars():[]]); }
+        if (!$this->c->config->mailEnabled && in_array($path,['/anfrage','/kontakt','/newsletter'],true)) {
+            return $show('notice.twig',['title'=>'Wir richten die Online-Anfragen ein.','message'=>'Die Website und das Seminarangebot sind bereits verfügbar. Anfrageformulare und Newsletter werden nach Einrichtung des E-Mail-Versands freigeschaltet. Es wurden keine Angaben übermittelt.'],$request->isMethod('POST')?503:200);
+        }
         $values=$this->values($request); $error=null;
         try {
             if (in_array($path,['/anfrage/bestaetigen','/newsletter/bestaetigen','/newsletter/abmelden'],true)) {

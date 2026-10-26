@@ -17,6 +17,7 @@ final class Config
     public readonly int $absoluteSeconds;
     public readonly string $mailerDsn;
     public readonly string $mailFrom;
+    public readonly bool $mailEnabled;
 
     public function __construct(public readonly string $root, array $values)
     {
@@ -53,8 +54,12 @@ final class Config
         if ($this->idleSeconds > $this->absoluteSeconds) {
             throw new \RuntimeException('Die Sitzungs-Inaktivitätsfrist darf die Gesamtfrist nicht überschreiten.');
         }
+        $mailEnabled=filter_var($values['APP_MAIL_ENABLED']??true,FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);
+        if ($mailEnabled===null) { throw new \RuntimeException('APP_MAIL_ENABLED muss true oder false sein.'); }
+        $this->mailEnabled=$mailEnabled;
         $this->mailerDsn = (string) ($values['MAILER_DSN'] ?? '');
         $this->mailFrom = (string) ($values['MAIL_FROM'] ?? '');
+        if (!$this->mailEnabled) { return; }
         if (filter_var($this->mailFrom, FILTER_VALIDATE_EMAIL) === false) {
             throw new \RuntimeException('MAIL_FROM ist ungültig.');
         }

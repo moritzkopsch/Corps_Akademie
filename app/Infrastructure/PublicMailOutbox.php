@@ -12,6 +12,7 @@ final class PublicMailOutbox
 
     public function enqueue(string $event, string $recipient, string $subject, string $text, ?int $tokenId = null): void
     {
+        if (!$this->config->mailEnabled) { throw new \DomainException('Der E-Mail-Versand ist noch nicht eingerichtet.'); }
         if (!$this->db->inTransaction()) { throw new \LogicException('Mailauftrag benötigt eine Transaktion.'); }
         $blocked=$this->config->environment!=='production' && !str_ends_with(mb_strtolower($recipient),'@example.test');
         $this->db->run('INSERT INTO public_mail_outbox(event_key,token_id,recipient,payload_ciphertext,key_id,status,message_id,created_at) VALUES(?,?,?,?,?,?,?,?)',[
@@ -22,6 +23,7 @@ final class PublicMailOutbox
 
     public function work(int $limit = 10): array
     {
+        if (!$this->config->mailEnabled) { throw new \DomainException('Der E-Mail-Versand ist deaktiviert. Es wurden keine Nachrichten versendet.'); }
         if ($this->db->inTransaction()) { throw new \LogicException('Kein SMTP innerhalb einer Transaktion.'); }
         $results=['submitted'=>0,'cancelled'=>0,'ambiguous'=>0,'blocked'=>0];
         for ($i=0;$i<$limit;$i++) {

@@ -36,9 +36,10 @@ $console->add((new Command('setup:link'))->setDescription('Einmaligen, 30 Minute
         $output->writeln($container()->links->setupLink()); return 0;
     }));
 $console->add((new Command('content:seed'))->setDescription('Lokale Präsentationsinhalte einmalig ergänzen; bestehende Inhalte bleiben erhalten.')
+    ->addOption('presentation',null,InputOption::VALUE_NONE,'Präsentationsinhalte ausdrücklich auch bei deaktiviertem Mailversand auf dem Server ergänzen.')
     ->setCode(static function(InputInterface $input,OutputInterface $output) use ($container,$root): int {
         $c=$container();
-        $output->writeln(json_encode(CatalogSeeder::seed($c->db,$c->catalog,$root,$c->clock->now()->getTimestamp()),JSON_THROW_ON_ERROR));
+        $output->writeln(json_encode(CatalogSeeder::seed($c->db,$c->catalog,$root,$c->clock->now()->getTimestamp(),(bool)$input->getOption('presentation')),JSON_THROW_ON_ERROR));
         return 0;
     }));
 $console->add((new Command('user:create'))->setDescription('Konto mit verdeckter Passworteingabe und anschließender E-Mail-Bestätigung anlegen.')

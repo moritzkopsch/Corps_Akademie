@@ -1,6 +1,6 @@
 # Namecheap/cPanel: Servereinrichtung
 
-Die eingecheckte `.cpanel.yml` ruft den Deploymenthelfer für `/home/pushgobt/repositories/Corps_Akademie` auf. Der private Installationsordner ist `/home/pushgobt/apps/corpsakademie`. Die Website wird erst beim Deployment aktiviert, nicht schon beim Abrufen eines Git-Commits.
+Die eingecheckte `.cpanel.yml` ruft den Deploymenthelfer für `/home/pushgobt/repositories/Corps_Akademie` auf. Der private Installationsordner ist `/home/pushgobt/corps-akademie.r4av.com`. Die Website wird erst beim Deployment aktiviert, nicht schon beim Abrufen eines Git-Commits.
 
 ## Erster Start
 
@@ -9,13 +9,13 @@ Die eingecheckte `.cpanel.yml` ruft den Deploymenthelfer für `/home/pushgobt/re
 
 ```bash
 cd /home/pushgobt/repositories/Corps_Akademie
-bash scripts/deploy-cpanel.sh --init --base /home/pushgobt/apps/corpsakademie
+bash scripts/deploy-cpanel.sh --init --base /home/pushgobt/corps-akademie.r4av.com
 ```
 
 3. Die privaten Dateien bearbeiten:
 
-- `/home/pushgobt/apps/corpsakademie/shared/.env`: echte HTTPS-Domain, SMTP-Zugang und Absender eintragen. Den erzeugten APP_KEY aufbewahren; keine Zugangsdaten nach Git übernehmen.
-- `/home/pushgobt/apps/corpsakademie/shared/deploy.json`: tatsächlichen Webroot und den lokalen Composer-Pfad prüfen. Voreingestellt sind `$HOME/public_html` und `$HOME/bin/composer`.
+- `/home/pushgobt/corps-akademie.r4av.com/shared/.env`: echte HTTPS-Domain, SMTP-Zugang und Absender eintragen. Den erzeugten APP_KEY aufbewahren; keine Zugangsdaten nach Git übernehmen.
+- `/home/pushgobt/corps-akademie.r4av.com/shared/deploy.json`: tatsächlichen Webroot und den lokalen Composer-Pfad prüfen. Voreingestellt sind `$HOME/public_html` und `$HOME/bin/composer`.
 
 4. In cPanel **Deploy HEAD Commit** anklicken.
 
@@ -38,7 +38,7 @@ Der Helfer sucht ein freigegebenes CLI-PHP. Bei Bedarf einen bestätigten PHP-Pf
 Nach erfolgreicher Bereitstellung mit dem bestätigten PHP-Interpreter den stabilen Wrapper verwenden:
 
 ```bash
-/ABSOLUTER/PFAD/ZUM/php /home/pushgobt/apps/corpsakademie/current/scripts/cpanel-console.php --base=/home/pushgobt/apps/corpsakademie setup:link
+/ABSOLUTER/PFAD/ZUM/php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --base=/home/pushgobt/corps-akademie.r4av.com setup:link
 ```
 
 Für Konto-/Anfrage-/Newsletter-Bestätigungsmails einen Cronjob mit demselben Wrapper und `mail:work --limit=4` einrichten. Auf Shared Hosting mindestens fünf Minuten Abstand einhalten und die zum Tarif gehörige Versandquote berücksichtigen; kleinere Stapel gegebenenfalls weiter begrenzen. Keine parallelen direkten `bin/console mail:work`-Läufe verwenden, da diese die Deployment-Sperre umgehen würden. Der lokale `mail:watch` ist nicht für den Server vorgesehen.
@@ -48,3 +48,14 @@ Seminarinhalte und Benutzer stehen in der Datenbank und werden nicht durch Git �
 Lokale Deploymenttests verwenden echte Git-Archive und SQLite-Migrationen, ersetzen aber Composer-Download und HTTPS-Transport. Eine erfolgreiche Namecheap-Serverabnahme wird dadurch nicht behauptet. Der SSH-Zugang wurde nicht verändert; beim rein lesenden Verbindungsversuch fehlte ein verifizierter Server-Hostschlüssel, daher fand kein Serverzugriff statt.
 
 Offizielle Hinweise: https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/ und https://www.namecheap.com/support/knowledgebase/article.aspx/10113/2210/how-to-use-git-version-control-cpanel-plugin/
+
+
+## Tatsächliche Domainzuordnung und Start ohne Mail
+
+Der private Basisordner ist `/home/pushgobt/corps-akademie.r4av.com`. Die Domain zeigt ausschließlich auf den separaten öffentlichen Ordner `/home/pushgobt/www-corpsakademie`. In `shared/deploy.json` muss deshalb `webroot` genau `/home/pushgobt/www-corpsakademie` sein. Der private Basisordner und der Git-Checkout dürfen nicht als Document Root verwendet werden.
+
+Für die ausdrücklich gewünschte erste Website-Freischaltung ohne Versand wird `APP_MAIL_ENABLED=false` in der privaten `shared/.env` gesetzt. `MAILER_DSN` und `MAIL_FROM` können dann leer bleiben. Anfrage- und Newsletterformulare sowie Kontoersteinrichtung sind in diesem Zustand deaktiviert; es werden keine Mails als versendet markiert. Die öffentliche Website zeigt einen Hinweis und bleibt für Suchmaschinen auf noindex.
+
+Die bereits erarbeiteten Präsentationsinhalte können in diesem Zustand ausdrücklich mit `content:seed --presentation` ergänzt werden. Bestehende Einträge werden nicht überschrieben. Es werden keine Benutzerkonten oder Standardpasswörter erzeugt.
+
+Nach Einrichtung eines echten SMTP-Zugangs und Absenders `APP_MAIL_ENABLED=true` setzen. Dann gelten die ursprünglichen SMTP-/TLS-Prüfungen wieder; die Versand- und Anmeldefunktionen werden freigeschaltet. Inhalte und Rechtstexte benötigen weiterhin eine redaktionelle Freigabe.
