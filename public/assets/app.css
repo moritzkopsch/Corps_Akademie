@@ -643,3 +643,5 @@ summary {
   }
 
 }
+
+.newsletter-preview{white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #ddd;padding:1.25rem;margin:1rem 0}button:disabled{opacity:.5;cursor:not-allowed}

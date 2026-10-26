@@ -16,6 +16,7 @@ final class PublicWebsite
         if (in_array($path,['/anfrage','/kontakt','/newsletter','/anfrage/bestaetigen','/newsletter/bestaetigen','/newsletter/abmelden'],true)) { return ['GET','POST']; }
         if (preg_match('~^/(seminare|referenten)/[a-z0-9]+(?:-[a-z0-9]+)*$~D',$path)) { return ['GET']; }
         if (preg_match('~^/admin/(seminare|referenten)(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?$~D',$path)) { return ['GET','POST']; }
+        if (preg_match('~^/admin/newsletter(?:/(?:neu|[1-9][0-9]{0,9}))?$~D',$path)) { return ['GET','POST']; }
         if (preg_match('~^/admin/anfragen(?:/[A-Za-z0-9_-]{43})?$~D',$path)) { return ['GET','POST']; }
         return null;
     }
@@ -44,6 +45,9 @@ final class PublicWebsite
             return $show('referent.twig',['referent'=>$referent,'seminars'=>$seminars]);
         }
         if (in_array($path,['/ueber-uns','/faq','/termine','/impressum','/datenschutz'],true)) { return $show('information.twig',['page'=>substr($path,1),'seminars'=>$path==='/termine'?$this->c->catalog->seminars():[]]); }
+        if (!$this->c->config->mailEnabled && in_array($path,['/anfrage','/kontakt','/newsletter'],true)) {
+            return $show('notice.twig',['title'=>'Wir richten die Online-Anfragen ein.','message'=>'Die Website und das Seminarangebot sind bereits verfügbar. Anfrageformulare und Newsletter werden nach Einrichtung des E-Mail-Versands freigeschaltet. Es wurden keine Angaben übermittelt.'],$request->isMethod('POST')?503:200);
+        }
         $values=$this->values($request); $error=null;
         try {
             if (in_array($path,['/anfrage/bestaetigen','/newsletter/bestaetigen','/newsletter/abmelden'],true)) {

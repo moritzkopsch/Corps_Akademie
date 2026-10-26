@@ -23,7 +23,7 @@ final class InquiryRepository
 
     public function requestSubscriber(string $email, string $emailKey, int $now, string $consent): int
     {
-        $this->db->run("INSERT INTO newsletter_subscribers(email,email_key,state,consent_version,requested_at) VALUES(?,?,'pending',?,?) ON CONFLICT(email_key) DO UPDATE SET email=excluded.email,state='pending',consent_version=excluded.consent_version,requested_at=excluded.requested_at,confirmed_at=NULL,unsubscribed_at=NULL",[$email,$emailKey,$consent,$now]);
+        $this->db->run("INSERT INTO newsletter_subscribers(email,email_key,state,consent_version,requested_at) VALUES(?,?,'pending',?,?) ON CONFLICT(email_key) DO UPDATE SET email=excluded.email,state='pending',consent_version=excluded.consent_version,requested_at=excluded.requested_at,subscription_version=newsletter_subscribers.subscription_version+1,confirmed_at=NULL,unsubscribed_at=NULL",[$email,$emailKey,$consent,$now]);
         return (int)$this->subscriber($emailKey)['id'];
     }
 

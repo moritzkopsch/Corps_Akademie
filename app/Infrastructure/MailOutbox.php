@@ -12,6 +12,7 @@ final class MailOutbox
 
     public function enqueue(string $kind, array $user, array $token): void
     {
+        if (!$this->config->mailEnabled) { throw new \DomainException('Der E-Mail-Versand ist noch nicht eingerichtet.'); }
         if (!$this->db->inTransaction()) { throw new \LogicException('Mailauftrag benötigt eine fachliche Transaktion.'); }
         $path = $kind === 'password_reset' ? '/passwort-neu' : '/email-bestaetigen';
         $link = $this->config->url . $path . '#token=' . $token['token'];
@@ -25,6 +26,7 @@ final class MailOutbox
 
     public function work(int $limit = 10): array
     {
+        if (!$this->config->mailEnabled) { throw new \DomainException('Der E-Mail-Versand ist deaktiviert. Es wurden keine Nachrichten versendet.'); }
         if ($this->db->inTransaction()) { throw new \LogicException('Kein SMTP-Versand innerhalb einer Transaktion.'); }
         $results = ['submitted'=>0,'cancelled'=>0,'ambiguous'=>0,'blocked'=>0];
         for ($i=0; $i<$limit; $i++) {
@@ -55,7 +57,7 @@ final class MailOutbox
                 $title = $row['kind'] === 'password_reset' ? 'Passwort zurücksetzen' : 'E-Mail-Adresse bestätigen';
                 $intro = $row['kind'] === 'password_reset' ? 'Du hast ein neues Passwort angefordert.' : 'Bitte bestätige deine E-Mail-Adresse für dein Corpsakademie-Konto.';
                 $link = htmlspecialchars($payload['link'],ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
-                $message = (new Email())->from($this->config->mailFrom)->to($row['recipient'])->subject('Corpsakademie · '.$title)
+                $message = (new Email())->from($this->config->mailFrom)->replyTo($this->config->mailReplyTo)->to($row['recipient'])->subject('Corpsakademie · '.$title)
                     ->text($intro."\n\n".$payload['link']."\n\nDieser Link ist einmalig und 30 Minuten gültig. Wenn du die Nachricht nicht angefordert hast, kannst du sie ignorieren.")
                     ->html('<html lang="de"><body><h1>'.htmlspecialchars($title).'</h1><p>'.htmlspecialchars($intro).'</p><p><a href="'.$link.'">'.htmlspecialchars($title).'</a></p><p>Einmalig nutzbar und 30 Minuten gültig. Falls du diese Nachricht nicht angefordert hast, kannst du sie ignorieren.</p></body></html>');
                 $message->getHeaders()->addIdHeader('Message-ID',$row['message_id']);

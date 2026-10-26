@@ -342,7 +342,7 @@ Zusätzlich gelten folgende Invarianten:
 3. Für Reservierungs- und Buchungsblöcke gibt es höchstens einen Block im Zustand active oder confirmed je Slot und Terminintervall. Die Zuordnung von Slot, Termin und Buchung wird durch zusammengesetzte Referenzen beziehungsweise gezielte Trigger geprüft.
 4. Buchungsstatus, Slots, Einladungen, Kalenderblöcke, Ereignisse und Outbox ändern sich bei kritischen Übergängen gemeinsam in einer Transaktion.
 5. Intervalle sind halboffen: [start, end). Konflikt liegt bei existing_start < requested_end UND existing_end > requested_start vor. Ein angrenzender Termin ist nur ohne zusätzlich konfigurierte Puffer möglich.
-6. Einfache Unique-Indizes verhindern keine beliebigen Zeitüberschneidungen. Diese prüft die Anwendung unter BEGIN IMMEDIATE; Trigger auf Insert und relevante Updates sichern die gleiche Regel zusätzlich ab.
+6. Einfache Unique-Indizes verhindern keine beliebigen Zeitüberschneidungen. Diese prüft die Anwendung in einer Schreibtransaktion mit gesperrten Datensätzen (`SELECT … FOR UPDATE`); Trigger auf Insert und relevante Updates sichern die gleiche Regel zusätzlich ab.
 7. Ein Kalenderblock blockiert, wenn er confirmed ist oder wenn er active und ohne Ablauf beziehungsweise noch nicht abgelaufen ist. Eine temporäre Reservierung braucht immer ein expires_at. Bestätigungen prüfen die tatsächliche Uhrzeit unabhängig von verspäteten Cron-Läufen.
 8. Versionen, Freigaben, Annahmen und versendete Inhaltsstände sind unveränderlich. Änderungen erzeugen neue Versionen, keine Überschreibung historischer Grundlagen.
 9. Angebotssummen, Versionseigentum und veröffentlichungsfähige Inhalte werden serverseitig geprüft. Ein Angebot einer anderen Buchung lässt sich nicht als Annahme verknüpfen.
@@ -454,7 +454,7 @@ Modus A erzeugt einen offenen Platz mit allen gemäß Policy geeigneten Kandidat
 Eine Referentenzusage wird folgendermaßen verarbeitet:
 
 1. Login, Datensatzbesitz, Anfrageinhalt und Idempotenz prüfen.
-2. Schreibtransaktion mit BEGIN IMMEDIATE beginnen.
+2. Schreibtransaktion beginnen und die betroffenen Datensätze mit `FOR UPDATE` sperren.
 3. Buchung, Gesamtfrist, Einladung und Platz aus der Datenbank neu lesen.
 4. Kandidatenfreigabe, Pflichtperson, fachliche Eignung und aktive Referentenregistrierung prüfen.
 5. Alle Terminintervalle einschließlich Puffer gegen Verfügbarkeit, Ausnahmen und noch aktive Belegungen prüfen.
