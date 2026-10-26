@@ -73,6 +73,10 @@ Die Passworteingabe für `user:create` erfolgt verdeckt im interaktiven Terminal
 
 Der spätere Kundenbetrieb verlangt eine geprüfte Serverinstallation mit HTTPS und ausschließlich `public/` als Webroot. Die lokale PHP-Serverfunktion und `mail:watch` dienen der Entwicklung. Produktiver Versand verwendet `mail:work` als begrenzten CLI-Lauf; die vollständige Cron-/Queue-Betriebsabnahme folgt im Automatisierungsmodul.
 
+## Namecheap / cPanel
+
+Die eingecheckte `.cpanel.yml` startet den Deploymenthelfer für das Konto `pushgobt`. Vor dem ersten Deployment private Konfiguration einrichten: [Namecheap-Anleitung](docs/NAMECHEAP.md).
+
 ## Dokumentation
 
 - [Öffentliche Website und Präsentationsablauf](docs/WEBSITE.md)

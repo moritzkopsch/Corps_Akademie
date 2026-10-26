@@ -1,0 +1,34 @@
+#!/bin/bash
+set -euo pipefail
+
+SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+# cPanel's interactive and deployment PHP defaults need not match. Never change
+# the account-wide PHP setting or bypass the application's version requirements.
+if [[ -n "${CORPS_DEPLOY_PHP:-}" ]]; then
+  CANDIDATES=("$CORPS_DEPLOY_PHP")
+else
+  CANDIDATES=(
+    /opt/alt/php85/usr/bin/php
+    /opt/alt/php84/usr/bin/php
+    /opt/cloudlinux/alt-php85/root/usr/bin/php
+    /opt/cloudlinux/alt-php84/root/usr/bin/php
+    /opt/cpanel/ea-php85/root/usr/bin/php
+    /opt/cpanel/ea-php84/root/usr/bin/php
+    "$(command -v php || true)"
+  )
+fi
+
+for PHP_CANDIDATE in "${CANDIDATES[@]}"; do
+  [[ -x "$PHP_CANDIDATE" ]] || continue
+  if "$PHP_CANDIDATE" -r '
+    require $argv[1]."/app/Infrastructure/Config.php";
+    exit(PHP_SAPI === "cli" && \Corpsakademie\Infrastructure\Config::runtimeSupported(PHP_VERSION) ? 0 : 1);
+  ' "$SOURCE_DIR" >/dev/null 2>&1; then
+    exec "$PHP_CANDIDATE" "$SOURCE_DIR/deployment/cpanel/run.php" "$@"
+  fi
+done
+
+echo '[FEHLER] Kein freigegebenes CLI-PHP gefunden. Benötigt: PHP 8.4 ab 8.4.27 oder PHP 8.5 ab 8.5.12.' >&2
+echo 'Einen bestätigten Pfad gegebenenfalls mit CORPS_DEPLOY_PHP=/absoluter/pfad/php vorgeben.' >&2
+exit 1
