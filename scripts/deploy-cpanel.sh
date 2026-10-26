@@ -23,7 +23,9 @@ for PHP_CANDIDATE in "${CANDIDATES[@]}"; do
   [[ -x "$PHP_CANDIDATE" ]] || continue
   if "$PHP_CANDIDATE" -r '
     require $argv[1]."/app/Infrastructure/Config.php";
-    exit(PHP_SAPI === "cli" && \Corpsakademie\Infrastructure\Config::runtimeSupported(PHP_VERSION) ? 0 : 1);
+    $extensions=["curl","intl","mbstring","pdo_sqlite","sodium","xmlwriter","phar"];
+    $complete=array_filter($extensions,static fn($extension)=>!extension_loaded($extension))===[];
+    exit(PHP_SAPI === "cli" && $complete && \Corpsakademie\Infrastructure\Config::runtimeSupported(PHP_VERSION) ? 0 : 1);
   ' "$SOURCE_DIR" >/dev/null 2>&1; then
     exec "$PHP_CANDIDATE" "$SOURCE_DIR/deployment/cpanel/run.php" "$@"
   fi
