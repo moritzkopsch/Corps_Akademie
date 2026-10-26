@@ -1,6 +1,6 @@
 # Öffentliche Website und Präsentationsablauf
 
-Stand: 25. Oktober 2026. Auf dem bestehenden PHP-/SQLite-Fundament ist eine öffentliche Website mit echter Inhaltsverwaltung und verifizierten Gastanfragen umgesetzt. Sie ist als lokale Kundenpräsentation nutzbar. Die vollständige automatische Buchungskoordination bleibt ein eigenes Modul.
+Stand: 25. Oktober 2026. Auf dem bestehenden PHP-/PostgreSQL-Fundament ist eine öffentliche Website mit echter Inhaltsverwaltung und verifizierten Gastanfragen umgesetzt. Sie ist als lokale Kundenpräsentation nutzbar. Die vollständige automatische Buchungskoordination bleibt ein eigenes Modul.
 
 ## Gestaltung und Zielgruppe
 

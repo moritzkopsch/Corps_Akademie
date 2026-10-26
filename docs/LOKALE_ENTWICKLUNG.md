@@ -9,7 +9,7 @@ Eingerichtet am 24. Oktober 2026 auf dem vorhandenen Mac. Dieser Schritt richtet
 | Werkzeug | Geprüfte Version |
 |---|---|
 | PHP | 8.5.12 |
-| SQLite über PHP | 3.54.1 |
+| PostgreSQL | Ab Version 10 erforderlich; Zugang über die `PG*`- beziehungsweise `APP_DB_*`-Variablen |
 | Composer | 2.10.3 |
 | Mailpit | 1.32.0 |
 
@@ -24,7 +24,7 @@ php scripts/check-local.php
 bash scripts/composer diagnose
 ```
 
-Die PHP-Prüfung kontrolliert Version, Erweiterungen, Argon2id, SQLite-Version, WAL, Fremdschlüssel, eine Schreibsperre zwischen zwei Prozessen, Rollback und konsistentes Backup. Die Testdatenbank wird im temporären Verzeichnis angelegt und wieder entfernt. Ein Fehler liefert einen von null verschiedenen Exitcode. Dies ist ein Umgebungstest, noch kein Test der späteren Buchungslogik.
+Die PHP-Prüfung kontrolliert Version, Erweiterungen, Argon2id, die Erreichbarkeit des PostgreSQL-Servers, dessen Mindestversion, `jsonb`, Identity-Spalten, Fremdschlüsselverletzungen, Sperrkonflikte, `FOR UPDATE SKIP LOCKED`, Rollback und eine `pg_dump`-Sicherung. Die Prüfung legt ein eigenes Schema an und entfernt es wieder. Ein Fehler liefert einen von null verschiedenen Exitcode. Dies ist ein Umgebungstest, noch kein Test der späteren Buchungslogik.
 
 Der Composer-Wrapper legt Konfiguration und Cache im ignorierten Ordner `.local/composer/` ab. Dort sind die öffentlichen Release- und Snapshot-Prüfschlüssel der offiziellen Composer-Seite hinterlegt. Für weitere Projekte bleibt die globale Composer-Konfiguration unabhängig. [Offizielle Prüfschlüssel](https://composer.github.io/pubkeys.html)
 

@@ -6,7 +6,7 @@ Implementierungsstand: 24. Oktober 2026. Dies ist das erste ausführbare Produkt
 
 - Composer-Projekt mit festgeschriebenen Abhängigkeiten und PHP-Kompatibilitätsgrenzen.
 - Validierte Umgebungskonfiguration, generierter 256-Bit-Anwendungsschlüssel und private Speicherpfade.
-- Zentrale PDO-Verbindung mit Foreign Keys, WAL, Busy Timeout und synchronous=FULL.
+- Zentrale PDO-Verbindung zu PostgreSQL mit serverseitigen Fremdschlüsseln, Identity-Spalten und kurzen Transaktionen.
 - Transaktionale, prüfsummengesicherte Migrationen; Sicherung vor weiteren Migrationen auf bestehenden Daten.
 - CLI-Installer, Diagnose, lokale konsistente Datenbanksicherung und technische Sitzungsbereinigung.
 - Erstes Superadministratorkonto über einen zeitlich begrenzten Einmallink; kein Defaultkonto und kein Defaultpasswort.
@@ -26,7 +26,7 @@ Implementierungsstand: 24. Oktober 2026. Dies ist das erste ausführbare Produkt
 |---|---|
 | app/Domain/Identity | Passwort-, Berechtigungs-, Token-, Rate-Limit- und MFA-Regeln |
 | app/Application | Fachliche Abläufe für Ersteinrichtung, Verifikation und Passwortwiederherstellung |
-| app/Infrastructure | Konfiguration, SQLite-Verbindung, IdentityRepository, Migrationen, Verschlüsselung, Audit und SMTP-Outbox |
+| app/Infrastructure | Konfiguration, PostgreSQL-Verbindung, IdentityRepository, Migrationen, Verschlüsselung, Audit und SMTP-Outbox |
 | app/Http | HTTP-Abläufe, Sitzungs-Cookies, CSRF und Weiterleitungen |
 | resources/views | Twig-Templates mit automatischem HTML-Escaping |
 | public | Einziger Webroot: Frontcontroller und öffentliche Assets |
@@ -34,7 +34,7 @@ Implementierungsstand: 24. Oktober 2026. Dies ist das erste ausführbare Produkt
 | bin/console | Lokale/serverseitige Betriebsbefehle; nicht öffentlich erreichbar |
 | tests | Isolierte Integrationstests einschließlich echter konkurrierender PHP-Prozesse |
 
-SQL der Identitätsdaten liegt im IdentityRepository. Fachliche Regeln und HTTP-Controller rufen dessen benannte Methoden auf. Zusammenhängende Änderungen nutzen dieselbe kurze SQLite-Schreibtransaktion. Mailversand findet außerhalb der Schreibtransaktion statt.
+SQL der Identitätsdaten liegt im IdentityRepository. Fachliche Regeln und HTTP-Controller rufen dessen benannte Methoden auf. Zusammenhängende Änderungen nutzen dieselbe kurze Schreibtransaktion; konkurrierende Einlösungen eines Einmallinks werden über `FOR UPDATE` serialisiert. Mailversand findet außerhalb der Schreibtransaktion statt.
 
 ## Installation und Ersteinrichtung
 
@@ -60,7 +60,11 @@ Das erste Konto und CLI-Konten beginnen mit unbestätigter Adresse. Der Mailwork
 | APP_URL | Feste Basis-URL ohne Unterverzeichnis; Produktion benötigt HTTPS |
 | APP_KEY | Base64-kodierter 256-Bit-Schlüssel für verschlüsselte Nutzlasten und HMACs |
 | APP_KEY_ID | Kennung des zugehörigen Schlüssels, aktuell v1 |
-| APP_DB_PATH | SQLite-Datei außerhalb des Webroots; relativ zum Projekt oder absolut |
+| APP_DB_HOST | PostgreSQL-Server, lokal 127.0.0.1 |
+| APP_DB_PORT | PostgreSQL-Port, voreingestellt 5432 |
+| APP_DB_NAME | Name der Datenbank auf dem PostgreSQL-Server |
+| APP_DB_USER | Datenbankbenutzer |
+| APP_DB_PASSWORD | Passwort des Datenbankbenutzers; wird ausschließlich in der privaten `.env` gehalten |
 | APP_STORAGE_PATH | Private Logs und lokale Sicherungen außerhalb des Webroots |
 | SESSION_IDLE_SECONDS | Serverseitige Inaktivitätsfrist, lokal voreingestellt 1800 Sekunden |
 | SESSION_ABSOLUTE_SECONDS | Maximale Sitzungsdauer, lokal voreingestellt 43200 Sekunden |
@@ -93,9 +97,9 @@ In Nichtproduktion sind als Versandweg ausschließlich localhost beziehungsweise
 
 ## Sicherung und Diagnose
 
-`php bin/console db:backup` erstellt mittels VACUUM INTO eine konsistente Datenbanksicherung, prüft Integrität und Fremdschlüssel und vermerkt den Stand. Die Datei ist lokal, außerhalb des Webroots und mit restriktiven Rechten gespeichert. Diese lokale Sicherung ist nicht vollständig dateiverschlüsselt und kein bereits fertiggestelltes externes Produktions-Backupkonzept. Verschlüsselte externe Sicherung, Medien-/Konfigurationsmanifest und vollständige Restore-Abnahme folgen im Betriebsmodul.
+`php bin/console db:backup` erstellt mit `pg_dump` im Klartextformat eine konsistente Datenbanksicherung, prüft den Integritätsmarker des Dumps und vermerkt den Stand in `backup_history`. Die Datei ist lokal, außerhalb des Webroots und mit restriktiven Rechten gespeichert. Diese lokale Sicherung ist nicht vollständig dateiverschlüsselt und kein bereits fertiggestelltes externes Produktions-Backupkonzept. Verschlüsselte externe Sicherung, Medien-/Konfigurationsmanifest und vollständige Restore-Abnahme folgen im Betriebsmodul.
 
-`doctor` prüft PHP-Patchstand, Integrität, Foreign Keys und Migrationsprüfsummen. `session:prune` bereinigt abgelaufene/widerrufene Sitzungen und alte technische Rate-Limit-Buckets mit 24 Stunden Nachlauf. Sonstige Aufbewahrungs- und Löschfristen werden nicht als bereits fachlich freigegeben behauptet. Sicherheitsereignisse tragen derzeit 90 Tage als vorgesehenen Nachhaltezeitpunkt; eine produktive Löschroutine und ihre Freigabe folgen vor dem Pilotbetrieb.
+`doctor` prüft PHP-Patchstand, Datenbankverbindung, PostgreSQL-Mindestversion, vorhandene Fremdschlüsselregeln und Migrationsprüfsummen. `session:prune` bereinigt abgelaufene/widerrufene Sitzungen und alte technische Rate-Limit-Buckets mit 24 Stunden Nachlauf. Sonstige Aufbewahrungs- und Löschfristen werden nicht als bereits fachlich freigegeben behauptet. Sicherheitsereignisse tragen derzeit 90 Tage als vorgesehenen Nachhaltezeitpunkt; eine produktive Löschroutine und ihre Freigabe folgen vor dem Pilotbetrieb.
 
 ## Prüfungen und Abnahmegrenze
 

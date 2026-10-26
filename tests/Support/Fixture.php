@@ -18,14 +18,21 @@ abstract class Fixture extends TestCase
     protected TestMailer $mailer;
     protected array $cookies=[];
     protected const PASSWORD='Only for automated tests 2026!';
+    private static ?string $schema = null;
 
     protected function setUp(): void
     {
         $this->root=dirname(__DIR__,2);
         $this->directory=sys_get_temp_dir().'/corpsakademie-test-'.bin2hex(random_bytes(8));
+        $values=$this->values();
+        if ($values['APP_DB_USER']==='' || $values['APP_DB_PASSWORD']==='') {
+            $this->markTestSkipped('PostgreSQL-Testdatenbank fehlt. TEST_DB_NAME, TEST_DB_USER und TEST_DB_PASSWORD setzen.');
+        }
+        try { self::prepareSchema($values); }
+        catch (\RuntimeException $error) { $this->markTestSkipped($error->getMessage()); }
         mkdir($this->directory,0700);
         $this->clock=new TestClock(); $this->mailer=new TestMailer();
-        $this->c=new Container(new Config($this->root,$this->values()),$this->clock,$this->mailer);
+        $this->c=new Container(new Config($this->root,$values),$this->clock,$this->mailer);
         (new Migrator($this->c->db,$this->root.'/database/migrations'))->migrate();
         $this->app=new Application($this->c);
     }
@@ -34,9 +41,41 @@ abstract class Fixture extends TestCase
     {
         return array_replace([
             'APP_ENV'=>'test','APP_URL'=>'http://127.0.0.1:8080','APP_KEY'=>base64_encode(random_bytes(32)),
-            'APP_DB_PATH'=>$this->directory.'/database.sqlite','APP_STORAGE_PATH'=>$this->directory.'/storage',
+            'APP_DB_HOST'=>(string)(getenv('TEST_DB_HOST')?:'127.0.0.1'),
+            'APP_DB_PORT'=>(string)(getenv('TEST_DB_PORT')?:'5432'),
+            'APP_DB_NAME'=>(string)(getenv('TEST_DB_NAME')?:'corpsakademie_test'),
+            'APP_DB_USER'=>(string)(getenv('TEST_DB_USER')?:''),
+            'APP_DB_PASSWORD'=>(string)(getenv('TEST_DB_PASSWORD')?:''),
+            'APP_STORAGE_PATH'=>$this->directory.'/storage',
             'MAILER_DSN'=>'smtp://127.0.0.1:1025','MAIL_FROM'=>'system@example.test',
         ],$overrides);
+    }
+
+    protected static function dsn(array $values): string
+    {
+        return sprintf('pgsql:host=%s;port=%s;dbname=%s',$values['APP_DB_HOST'],$values['APP_DB_PORT'],$values['APP_DB_NAME']);
+    }
+
+    protected static function schemaName(): string
+    {
+        if (self::$schema === null) {
+            self::$schema=(string)(getenv('TEST_DB_SCHEMA')?:'corps_test_'.bin2hex(random_bytes(4)));
+        }
+        return self::$schema;
+    }
+
+    private static function prepareSchema(array $values): void
+    {
+        $schema=self::schemaName();
+        // libpq übernimmt PGOPTIONS für jede Verbindung, also auch für die Prozesse der Parallelitätstests.
+        putenv('PGOPTIONS=-c search_path='.$schema);
+        try {
+            $pdo=new \PDO(self::dsn($values),$values['APP_DB_USER'],$values['APP_DB_PASSWORD'],[\PDO::ATTR_ERRMODE=>\PDO::ERRMODE_EXCEPTION]);
+            $pdo->exec('DROP SCHEMA IF EXISTS '.$schema.' CASCADE');
+            $pdo->exec('CREATE SCHEMA '.$schema);
+        } catch (\PDOException $error) {
+            throw new \RuntimeException('Die PostgreSQL-Testdatenbank ist nicht erreichbar: '.$error->getMessage(),0,$error);
+        }
     }
 
     protected function request(string $method,string $path,array $data=[],array $server=[]): Response
@@ -76,6 +115,9 @@ abstract class Fixture extends TestCase
 
     protected function tearDown(): void
     {
+        if (isset($this->c)) {
+            try { $this->c->db->pdo->exec('DROP SCHEMA IF EXISTS '.self::schemaName().' CASCADE'); } catch (\Throwable) {}
+        }
         unset($this->app,$this->c);
         $iterator=new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->directory,\FilesystemIterator::SKIP_DOTS),\RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($iterator as $item) { $item->isDir()?rmdir($item->getPathname()):unlink($item->getPathname()); }

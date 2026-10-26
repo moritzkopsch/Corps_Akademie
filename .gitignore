@@ -1,9 +1,7 @@
 /.env
 /.env.*
 !/.env.example
-/storage/database/*.sqlite
-/storage/database/*.sqlite-wal
-/storage/database/*.sqlite-shm
+/storage/backups/*.sql
 *.db
 /storage/logs/*.log
 /public/uploads/*

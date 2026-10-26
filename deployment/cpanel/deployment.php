@@ -20,10 +20,10 @@ final class Deployment
     {
         Runtime::validate(Runtime::inspect());
         $shared=$this->base.'/shared';
-        if (!is_file($shared.'/.env') && (is_file($this->source.'/.env') || glob($this->source.'/storage/database/*.sqlite')!==[])) {
-            throw new \RuntimeException('Im Checkout liegen bereits Konfiguration oder Datenbanken. Zuerst vorhandenen Schlüssel und Daten sichern und zusammen übernehmen; es wurde kein neuer Schlüssel angelegt.');
+        if (!is_file($shared.'/.env') && is_file($this->source.'/.env')) {
+            throw new \RuntimeException('Im Checkout liegt bereits eine Konfiguration. Zuerst vorhandenen Schlüssel sichern und zusammen übernehmen; es wurde kein neuer Schlüssel angelegt.');
         }
-        foreach ([$this->base,$shared,$shared.'/storage',$shared.'/storage/database',$shared.'/storage/logs',$shared.'/storage/backups',$this->base.'/releases'] as $directory) { $this->directory($directory,0700); }
+        foreach ([$this->base,$shared,$shared.'/storage',$shared.'/storage/logs',$shared.'/storage/backups',$this->base.'/releases'] as $directory) { $this->directory($directory,0700); }
         $this->base=realpath($this->base);
         $shared=$this->base.'/shared';
         if (!is_file($shared.'/deploy.json')) {
@@ -32,21 +32,21 @@ final class Deployment
         }
         if (!is_file($shared.'/.env')) {
             $env="APP_ENV=production\nAPP_URL=https://CHANGE-ME.invalid\nAPP_KEY=\"".base64_encode(random_bytes(32))."\"\nAPP_KEY_ID=v1\n";
-            $env.='APP_DB_PATH="'.$shared.'/storage/database/application.sqlite"'."\n";
+            $env.="APP_DB_HOST=localhost\nAPP_DB_PORT=5432\nAPP_DB_NAME=CHANGE-ME\nAPP_DB_USER=CHANGE-ME\nAPP_DB_PASSWORD=\"CHANGE-ME\"\n";
             $env.='APP_STORAGE_PATH="'.$shared.'/storage"'."\n";
             $env.="SESSION_IDLE_SECONDS=1800\nSESSION_ABSOLUTE_SECONDS=43200\nMAILER_DSN=\"smtps://CHANGE-ME:CHANGE-ME@CHANGE-ME.invalid:465\"\nMAIL_FROM=CHANGE-ME@CHANGE-ME.invalid\n";
             $this->newFile($shared.'/.env',$env);
         }
         $this->newFile($shared.'/runtime.lock','');
         echo "[OK] Private Einrichtung vorhanden: ".$shared."\n";
-        echo "Jetzt APP_URL, SMTP und MAIL_FROM in shared/.env sowie Webroot/Composer in shared/deploy.json anpassen.\n";
+        echo "Jetzt APP_URL, PostgreSQL-Zugang, SMTP und MAIL_FROM in shared/.env sowie Webroot/Composer in shared/deploy.json anpassen.\n";
         echo "Vorhandene Dateien und Schlüssel wurden nicht überschrieben. Danach --check ausführen.\n";
     }
 
     public function check(): array
     {
         $runtime=Runtime::inspect(); Runtime::validate($runtime);
-        echo '[OK] CLI PHP '.$runtime['php'].' / SQLite '.$runtime['sqlite']."\n";
+        echo '[OK] CLI PHP '.$runtime['php'].' / pdo_pgsql '.$runtime['pgsql']."\n";
         if (!is_dir($this->base.'/shared')) { throw new \RuntimeException('Private Einrichtung fehlt. Zuerst deploy-cpanel.sh --init mit demselben --base ausführen.'); }
         $this->base=realpath($this->base);
         $shared=$this->base.'/shared';
@@ -75,7 +75,7 @@ final class Deployment
         if ((fileperms($shared.'/.env')&0077)!==0) { throw new \RuntimeException('shared/.env benötigt private Dateirechte, beispielsweise chmod 600.'); }
         $contents=file_get_contents($shared.'/.env');
         if (stripos($contents,'CHANGE-ME')!==false) { throw new \RuntimeException('shared/.env enthält noch Platzhalter. APP_URL, SMTP und Absender zuerst eintragen.'); }
-        foreach ([$shared.'/storage',$shared.'/storage/database',$this->base.'/releases'] as $directory) {
+        foreach ([$shared.'/storage',$this->base.'/releases'] as $directory) {
             if (!is_dir($directory) || !is_writable($directory)) { throw new \RuntimeException('Private Speicherverzeichnisse fehlen oder sind nicht beschreibbar. --init beziehungsweise Dateirechte prüfen.'); }
         }
         if (!is_file($shared.'/runtime.lock') || !is_writable($shared.'/runtime.lock')) { throw new \RuntimeException('shared/runtime.lock fehlt oder ist nicht beschreibbar. --init ausführen.'); }
@@ -155,7 +155,7 @@ final class Deployment
         try { $values=(new \Symfony\Component\Dotenv\Dotenv())->parse(file_get_contents($this->base.'/shared/.env')); }
         catch (\Throwable) { throw new \RuntimeException('shared/.env konnte nicht gelesen werden. Syntax prüfen; keine Zugangsdaten in Logs kopieren.'); }
         if (($values['APP_ENV']??'')!=='production') { throw new \RuntimeException('Diese Bereitstellung benötigt APP_ENV=production und echten, TLS-gesicherten SMTP-Versand.'); }
-        if (($values['APP_STORAGE_PATH']??'')!==$this->base.'/shared/storage' || ($values['APP_DB_PATH']??'')!==$this->base.'/shared/storage/database/application.sqlite') { throw new \RuntimeException('APP_STORAGE_PATH und APP_DB_PATH müssen auf die angelegten absoluten shared/storage-Pfade zeigen.'); }
+        if (($values['APP_STORAGE_PATH']??'')!==$this->base.'/shared/storage') { throw new \RuntimeException('APP_STORAGE_PATH muss auf den angelegten absoluten shared/storage-Pfad zeigen.'); }
         return new Config($root,$values);
     }
 
@@ -179,7 +179,7 @@ final class Deployment
             if (!is_array($data) || !is_string($data['nonce']??null) || !hash_equals($nonce,$data['nonce'])) { throw new \RuntimeException('APP_URL zeigt nicht auf den geprüften Webroot.'); }
             Runtime::validate($data);
             if (($data['https']??false)!==true) { throw new \RuntimeException('PHP erkennt die HTTPS-Verbindung nicht direkt. Hosting-Konfiguration prüfen; Proxy-Header werden nicht pauschal vertraut.'); }
-            echo '[OK] Web PHP '.$data['php'].' / SQLite '.$data['sqlite']." / HTTPS geprüft.\n";
+            echo '[OK] Web PHP '.$data['php'].' / pdo_pgsql '.$data['pgsql']." / HTTPS geprüft.\n";
         } finally { if (is_file($file)) { unlink($file); } }
     }
 

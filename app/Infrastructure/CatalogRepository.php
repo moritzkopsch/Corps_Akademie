@@ -6,7 +6,13 @@ final class CatalogRepository
 {
     public function __construct(private readonly Database $db) {}
 
-    public function categories(): array { return $this->db->run('SELECT * FROM seminar_categories ORDER BY position')->fetchAll(); }
+    public function categories(): array
+    {
+        return array_map(static function (array $row): array {
+            $row['id']=(int)$row['id']; $row['position']=(int)$row['position'];
+            return $row;
+        },$this->db->run('SELECT * FROM seminar_categories ORDER BY position')->fetchAll());
+    }
 
     public function seminars(bool $public = true, string $category = '', string $search = ''): array
     {
@@ -42,8 +48,8 @@ final class CatalogRepository
     {
         $params=[$data['slug'],$data['title'],$data['category_id'],$data['summary'],$data['description'],json_encode($data['benefits'],JSON_THROW_ON_ERROR),$data['audience'],$data['duration'],$data['format'],$data['status'],$data['featured'],$now];
         if ($existing===null) {
-            $this->db->run('INSERT INTO seminars(slug,title,category_id,summary,description,benefits_json,audience,duration,format,status,featured,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',[...$params,$now]);
-            $id=(int)$this->db->pdo->lastInsertId();
+            // PostgreSQL liefert die erzeugte Identität nur über RETURNING zurück.
+            $id=(int)$this->db->run('INSERT INTO seminars(slug,title,category_id,summary,description,benefits_json,audience,duration,format,status,featured,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
         } else {
             $changed=$this->db->run('UPDATE seminars SET slug=?,title=?,category_id=?,summary=?,description=?,benefits_json=?,audience=?,duration=?,format=?,status=?,featured=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
             if ($changed!==1) { throw new \DomainException('Das Seminar wurde zwischenzeitlich geändert. Bitte die Seite neu öffnen.'); }
@@ -58,8 +64,7 @@ final class CatalogRepository
     {
         $params=[$data['slug'],$data['name'],$data['headline'],$data['corps'],$data['biography'],json_encode($data['expertise'],JSON_THROW_ON_ERROR),$data['status'],$now];
         if ($existing===null) {
-            $this->db->run('INSERT INTO referent_profiles(slug,name,headline,corps,biography,expertise_json,status,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[...$params,$now]);
-            return (int)$this->db->pdo->lastInsertId();
+            return (int)$this->db->run('INSERT INTO referent_profiles(slug,name,headline,corps,biography,expertise_json,status,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
         }
         $changed=$this->db->run('UPDATE referent_profiles SET slug=?,name=?,headline=?,corps=?,biography=?,expertise_json=?,status=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
         if ($changed!==1) { throw new \DomainException('Das Profil wurde zwischenzeitlich geändert. Bitte die Seite neu öffnen.'); }
@@ -68,6 +73,9 @@ final class CatalogRepository
 
     private function seminarProjection(array $row): array
     {
+        // PostgreSQL liefert numerische Spalten als Zeichenketten; für strikte Vergleiche normalisieren.
+        $row['id']=(int)$row['id']; $row['category_id']=(int)$row['category_id'];
+        $row['featured']=(int)$row['featured']; $row['row_version']=(int)$row['row_version'];
         $row['benefits']=json_decode($row['benefits_json'],true,512,JSON_THROW_ON_ERROR);
         return $row;
     }
@@ -76,6 +84,7 @@ final class CatalogRepository
     {
         // Only editorial profile fields are public, never the linked account or its contact data.
         unset($row['user_id']);
+        $row['id']=(int)$row['id']; $row['row_version']=(int)$row['row_version'];
         $row['expertise']=json_decode($row['expertise_json'],true,512,JSON_THROW_ON_ERROR);
         $words=preg_split('/\s+/u',$row['name']);
         $row['initials']=mb_substr($words[0],0,1).mb_substr($words[count($words)-1],0,1);

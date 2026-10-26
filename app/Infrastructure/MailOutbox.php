@@ -32,7 +32,8 @@ final class MailOutbox
                 $now = $this->clock->now()->getTimestamp();
                 // An expired SMTP lease may already have transmitted its message.
                 $results['ambiguous'] += $this->db->run("UPDATE notification_outbox SET status='ambiguous',secret_payload_ciphertext=NULL,last_error_redacted='Worker-Lease abgelaufen; vor Neuversand klären' WHERE status='sending' AND lease_until<=?",[$now])->rowCount();
-                $row = $this->db->one("SELECT * FROM notification_outbox WHERE status='queued' AND available_at<=? ORDER BY id LIMIT 1",[$now]);
+                // SKIP LOCKED verhindert, dass zwei Worker dieselbe Nachricht leasen.
+                $row = $this->db->one("SELECT * FROM notification_outbox WHERE status='queued' AND available_at<=? ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED",[$now]);
                 if ($row === null) { return null; }
                 $lease = Crypto::token();
                 $this->db->run("UPDATE notification_outbox SET status='sending',attempts=attempts+1,lease_token=?,lease_until=? WHERE id=? AND status='queued'",[$lease,$now+300,$row['id']]);

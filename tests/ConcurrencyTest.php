@@ -28,7 +28,6 @@ try {
 CHILD;
         $config=$this->values([
             'APP_KEY'=>base64_encode($this->c->config->key),
-            'APP_DB_PATH'=>$this->c->config->databasePath,'APP_STORAGE_PATH'=>$this->c->config->storagePath,
         ]);
         $job['config']=$config; $job['time']=$this->clock->timestamp;
         $processes=[];
