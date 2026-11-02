@@ -85,5 +85,6 @@ Die eingecheckte `.cpanel.yml` startet den Deploymenthelfer für das Konto `push
 - [Machbarkeitsanalyse](docs/MACHBARKEIT.md)
 - [Lokale Werkzeuge und SMTP-Postfach](docs/LOKALE_ENTWICKLUNG.md)
 - [Implementiertes Fundament, Sicherheitsgrenzen und Installation](docs/FUNDAMENT.md)
+- [cPanel/Shared-Hosting: Generallösung, Installation und Git-Deployment](docs/CPANEL-GENERALLOESUNG.md)
 
 `.env`, `storage/`, `.local/` und `vendor/` sind von Git ausgeschlossen. Der Anwendungsschlüssel wird mit den zugehörigen Daten gesichert und niemals in Git eingecheckt.
