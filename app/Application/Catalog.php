@@ -54,8 +54,14 @@ final class Catalog
     {
         $this->authorize($actor); $data=[];
         foreach (['slug'=>100,'name'=>140,'headline'=>180,'biography'=>6000] as $key=>$max) { $data[$key]=self::text($values,$key,$max); }
-        $data['corps']=self::text($values,'corps',250,false);
+        $data['corps_memberships']=self::bullets($values,'corps_memberships',10);
+        // Die Textspalte corps bleibt für Altdaten erhalten und wird aus den Mitgliedschaften abgeleitet.
+        $data['corps']=$data['corps_memberships']===[]?self::text($values,'corps',250,false):implode(' · ',$data['corps_memberships']);
+        $data['career']=self::bullets($values,'career',12);
         $data['expertise']=self::lines($values,'expertise'); $data['status']=self::status($values);
+        $data['linkedin_url']=self::linkedin($values['linkedin_url']??'');
+        $data['image_path']=self::mediaPath($values['image_path']??'');
+        $data['cv_path']=self::mediaPath($values['cv_path']??'');
         $data['row_version']=(int)($values['row_version']??0); self::slug($data['slug']);
         return $this->db->immediate(function() use ($actor,$data,$existingSlug): string {
             $this->authorize($actor);
@@ -102,6 +108,29 @@ final class Catalog
         if (count($lines)<1 || count($lines)>12) { throw new \DomainException('Bitte zwischen 1 und 12 Stichpunkte eintragen.'); }
         foreach ($lines as $line) { if (mb_strlen($line)>250) { throw new \DomainException('Ein Stichpunkt ist zu lang.'); } }
         return $lines;
+    }
+
+    /** Optionale Stichpunktliste aus einem mehrzeiligen Textfeld. */
+    private static function bullets(array $values, string $key, int $max): array
+    {
+        $value=$values[$key]??'';
+        if (!is_string($value) || mb_strlen($value)>2000) { throw new \DomainException('Bitte das Feld „'.$key.'“ prüfen.'); }
+        $lines=array_values(array_filter(array_map('trim',explode("\n",$value))));
+        if (count($lines)>$max) { throw new \DomainException('Bitte höchstens '.$max.' Stichpunkte eintragen.'); }
+        foreach ($lines as $line) { if (mb_strlen($line)>250) { throw new \DomainException('Ein Stichpunkt ist zu lang.'); } }
+        return $lines;
+    }
+
+    /** Erlaubt ausschließlich vollständige LinkedIn-Profiladressen über HTTPS. */
+    public static function linkedin(mixed $value): string
+    {
+        $value=is_string($value)?trim($value):'';
+        if ($value==='') { return ''; }
+        $host=is_string(parse_url($value,PHP_URL_HOST))?strtolower((string)parse_url($value,PHP_URL_HOST)):'';
+        if (mb_strlen($value)>300 || filter_var($value,FILTER_VALIDATE_URL)===false || parse_url($value,PHP_URL_SCHEME)!=='https' || ($host!=='linkedin.com' && !str_ends_with($host,'.linkedin.com'))) {
+            throw new \DomainException('Bitte eine LinkedIn-Adresse wie https://www.linkedin.com/in/name angeben.');
+        }
+        return $value;
     }
 
     private static function slug(string $slug): void

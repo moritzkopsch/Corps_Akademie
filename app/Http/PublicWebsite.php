@@ -107,7 +107,12 @@ final class PublicWebsite
                     $this->c->content->saveSeminar((int)$user['id'],$payload,$existing['slug']??null);
                     if ($payload['image_path']!==$previous) { Uploads::remove($previous,$this->c->config->root); }
                 } else {
+                    $previousImage=$existing['image_path']??''; $previousCv=$existing['cv_path']??'';
+                    $payload['image_path']=$this->acceptUpload($request->files->get('image'),'referenten','image',$previousImage,$stored);
+                    $payload['cv_path']=$this->acceptUpload($request->files->get('cv'),'lebenslaeufe','pdf',$previousCv,$stored);
                     $this->c->content->saveReferent((int)$user['id'],$payload,$existing['slug']??null);
+                    if ($payload['image_path']!==$previousImage) { Uploads::remove($previousImage,$this->c->config->root); }
+                    if ($payload['cv_path']!==$previousCv) { Uploads::remove($previousCv,$this->c->config->root); }
                 }
                 return new RedirectResponse('/admin/'.$section,303);
             } catch (\DomainException $exception) {
@@ -140,7 +145,7 @@ final class PublicWebsite
 
     private function values(Request $request): array
     {
-        $values=array_fill_keys(['email','name','corps','role','phone','message','seminar','participants','date','location','format','token','state','slug','title','category_id','summary','description','audience','duration','status','featured','row_version','headline','biography','benefits','expertise','image_path'],'');
+        $values=array_fill_keys(['email','name','corps','role','phone','message','seminar','participants','date','location','format','token','state','slug','title','category_id','summary','description','audience','duration','status','featured','row_version','headline','biography','benefits','expertise','image_path','cv_path','linkedin_url','corps_memberships','career'],'');
         $values['referent_mode']='recommend'; $values['submission']=Crypto::token(); $values['referents']=[]; $values['duration_options']=[];
         foreach ($request->request->all() as $key=>$value) {
             if (in_array($key,['referents','duration_options'],true) && is_array($value)) { $values[$key]=array_values(array_filter($value,'is_string')); }

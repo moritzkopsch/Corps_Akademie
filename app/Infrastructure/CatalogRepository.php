@@ -67,11 +67,11 @@ final class CatalogRepository
 
     public function saveReferent(array $data, ?array $existing, int $now): int
     {
-        $params=[$data['slug'],$data['name'],$data['headline'],$data['corps'],$data['biography'],json_encode($data['expertise'],JSON_THROW_ON_ERROR),$data['status'],$now];
+        $params=[$data['slug'],$data['name'],$data['headline'],$data['corps'],$data['biography'],json_encode($data['expertise'],JSON_THROW_ON_ERROR),$data['status'],$data['image_path'],$data['linkedin_url'],$data['cv_path'],json_encode($data['corps_memberships'],JSON_THROW_ON_ERROR),json_encode($data['career'],JSON_THROW_ON_ERROR),$now];
         if ($existing===null) {
-            return (int)$this->db->run('INSERT INTO referent_profiles(slug,name,headline,corps,biography,expertise_json,status,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
+            return (int)$this->db->run('INSERT INTO referent_profiles(slug,name,headline,corps,biography,expertise_json,status,image_path,linkedin_url,cv_path,corps_memberships,career_json,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
         }
-        $changed=$this->db->run('UPDATE referent_profiles SET slug=?,name=?,headline=?,corps=?,biography=?,expertise_json=?,status=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
+        $changed=$this->db->run('UPDATE referent_profiles SET slug=?,name=?,headline=?,corps=?,biography=?,expertise_json=?,status=?,image_path=?,linkedin_url=?,cv_path=?,corps_memberships=?,career_json=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
         if ($changed!==1) { throw new \DomainException('Das Profil wurde zwischenzeitlich geändert. Bitte die Seite neu öffnen.'); }
         return (int)$existing['id'];
     }
@@ -94,6 +94,11 @@ final class CatalogRepository
         unset($row['user_id']);
         $row['id']=(int)$row['id']; $row['row_version']=(int)$row['row_version'];
         $row['expertise']=json_decode($row['expertise_json'],true,512,JSON_THROW_ON_ERROR);
+        $row['career']=json_decode($row['career_json'],true,512,JSON_THROW_ON_ERROR);
+        $memberships=json_decode($row['corps_memberships'],true,512,JSON_THROW_ON_ERROR);
+        // Altdaten ohne strukturierte Mitgliedschaften werden für Formular und Anzeige aufgeteilt.
+        $row['corps_memberships']=$memberships===[]&&$row['corps']!==''?array_values(array_filter(array_map('trim',explode('·',$row['corps'])))):$memberships;
+        if ($row['corps_memberships']!==[]) { $row['corps']=implode(' · ',$row['corps_memberships']); }
         $words=preg_split('/\s+/u',$row['name']);
         $row['initials']=mb_substr($words[0],0,1).mb_substr($words[count($words)-1],0,1);
         return $row;
