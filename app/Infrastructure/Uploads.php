@@ -14,9 +14,17 @@ final class Uploads
     private const TYPES = [
         'image' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
         'pdf' => ['application/pdf' => 'pdf'],
+        'document' => ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
     ];
 
-    private const LIMITS = ['image' => 2097152, 'pdf' => 5242880];
+    private const LIMITS = ['image' => 2097152, 'pdf' => 5242880, 'document' => 5242880];
+
+    /** Beschreibung der erlaubten Dateien je Verwendungszweck für Fehlermeldungen. */
+    private const DESCRIPTIONS = [
+        'image' => 'Bilder im Format JPG, PNG oder WebP mit höchstens 2 MB',
+        'pdf' => 'PDF-Dateien mit höchstens 5 MB',
+        'document' => 'PDF-Dateien oder Bilder im Format JPG, PNG oder WebP mit höchstens 5 MB',
+    ];
 
     public static function store(?UploadedFile $file, string $folder, string $type, string $root): string
     {
@@ -27,11 +35,11 @@ final class Uploads
         if (!isset(self::TYPES[$type])) { throw new \DomainException('Ungültiger Dateityp.'); }
         if (!$file->isValid()) { throw new \DomainException('Die Datei konnte nicht hochgeladen werden.'); }
         $limit = self::LIMITS[$type];
-        if ($file->getSize() > $limit) { throw new \DomainException($type === 'image' ? 'Das Bild darf höchstens 2 MB groß sein.' : 'Die Datei darf höchstens 5 MB groß sein.'); }
+        if ($file->getSize() > $limit) { throw new \DomainException('Die Datei ist zu groß. Erlaubt sind ' . self::DESCRIPTIONS[$type] . '.'); }
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($file->getPathname());
         $extensions = self::TYPES[$type];
         if (!is_string($mime) || !isset($extensions[$mime])) {
-            throw new \DomainException($type === 'image' ? 'Erlaubt sind Bilder im Format JPG, PNG oder WebP.' : 'Erlaubt sind PDF-Dateien.');
+            throw new \DomainException('Dieses Dateiformat wird nicht unterstützt. Erlaubt sind ' . self::DESCRIPTIONS[$type] . '.');
         }
         if ($type === 'image' && @getimagesize($file->getPathname()) === false) { throw new \DomainException('Die Bilddatei ist beschädigt.'); }
         $directory = $root . '/public/uploads/' . $folder;

@@ -644,4 +644,4 @@ summary {
 
 }
 
-.newsletter-preview{white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #ddd;padding:1.25rem;margin:1rem 0}button:disabled{opacity:.5;cursor:not-allowed}
+.newsletter-preview{white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #ddd;padding:1.25rem;margin:1rem 0}.newsletter-preview-html{white-space:normal}.newsletter-preview-html p,.newsletter-preview-html ul{margin:.5em 0}.newsletter-toolbar{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;margin:.25rem 0}.newsletter-attachments{list-style:none;margin:0 0 1rem;padding:0}.newsletter-attachments li{display:flex;gap:1rem;align-items:center;justify-content:space-between;border-bottom:1px solid #ddd;padding:.5rem 0}button:disabled{opacity:.5;cursor:not-allowed}

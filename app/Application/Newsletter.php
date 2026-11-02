@@ -3,13 +3,17 @@ declare(strict_types=1);
 namespace Corpsakademie\Application;
 
 use Corpsakademie\Domain\Identity\Accounts;
-use Corpsakademie\Infrastructure\{Audit,Config,Crypto,Database};
+use Corpsakademie\Infrastructure\{Audit,Config,Crypto,Database,Uploads};
 use Psr\Clock\ClockInterface;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 
 final class Newsletter
 {
+    /** Mehr Anhänge je Rundmail würden bei Empfängern und Mailserver auf Ablehnung stoßen. */
+    public const MAX_ATTACHMENTS = 3;
+
     public function __construct(private readonly Database $db, private readonly Config $config, private readonly Crypto $crypto, private readonly Accounts $accounts, private readonly Audit $audit, private readonly ClockInterface $clock, private readonly MailerInterface $mailer) {}
 
     public function overview(int $actor): array
@@ -23,6 +27,92 @@ final class Newsletter
     {
         $this->authorize($actor);
         return $this->db->one('SELECT * FROM newsletter_campaigns WHERE id=?',[$id]);
+    }
+
+    /** Anhänge eines Entwurfs in der Reihenfolge des Hochladens. */
+    public function attachments(int $actor,int $campaignId): array
+    {
+        $this->authorize($actor);
+        return $this->db->run('SELECT id,file_name,storage_path,size_bytes FROM newsletter_attachments WHERE campaign_id=? ORDER BY id',[$campaignId])->fetchAll();
+    }
+
+    /** Legt einen Anhang am Entwurf ab; nach der Freigabe bleibt die Rundmail unveränderlich. */
+    public function attach(int $actor,int $campaignId,?UploadedFile $file): void
+    {
+        if ($file === null || $file->getError() === UPLOAD_ERR_NO_FILE) { throw new \DomainException('Bitte eine Datei auswählen.'); }
+        $path = Uploads::store($file,'newsletter','document',$this->config->root);
+        try {
+            $this->db->immediate(function() use ($actor,$campaignId,$file,$path): void {
+                $this->authorize($actor); $this->requireDraft($campaignId);
+                $count = (int)$this->db->run('SELECT COUNT(*) FROM newsletter_attachments WHERE campaign_id=?',[$campaignId])->fetchColumn();
+                if ($count >= self::MAX_ATTACHMENTS) { throw new \DomainException('Pro Rundmail sind höchstens '.self::MAX_ATTACHMENTS.' Anhänge möglich.'); }
+                $this->db->run('INSERT INTO newsletter_attachments(campaign_id,file_name,storage_path,size_bytes,created_by,created_at) VALUES(?,?,?,?,?,?)',[$campaignId,self::fileName($file->getClientOriginalName()),$path,(int)$file->getSize(),$actor,$this->clock->now()->getTimestamp()]);
+                $this->audit->record('newsletter.attachment_added',$actor,(string)$campaignId,['file'=>$path],'campaign');
+            });
+        } catch (\Throwable $error) {
+            // Ohne Eintrag in der Datenbank darf die Datei nicht liegen bleiben.
+            Uploads::remove($path,$this->config->root);
+            throw $error;
+        }
+    }
+
+    /** Entfernt einen Anhang des Entwurfs und löscht die zugehörige Datei. */
+    public function detach(int $actor,int $campaignId,int $attachmentId): void
+    {
+        $path = $this->db->immediate(function() use ($actor,$campaignId,$attachmentId): string {
+            $this->authorize($actor); $this->requireDraft($campaignId);
+            $row = $this->db->one('SELECT storage_path FROM newsletter_attachments WHERE id=? AND campaign_id=?',[$attachmentId,$campaignId]);
+            if ($row === null) { throw new \DomainException('Dieser Anhang ist nicht vorhanden.'); }
+            $this->db->run('DELETE FROM newsletter_attachments WHERE id=?',[$attachmentId]);
+            $this->audit->record('newsletter.attachment_removed',$actor,(string)$campaignId,['file'=>$row['storage_path']],'campaign');
+            return $row['storage_path'];
+        });
+        Uploads::remove($path,$this->config->root);
+    }
+
+    /**
+     * Wandelt die einfache Auszeichnung der Rundmail in HTML um.
+     * Alles wird zuerst maskiert; erzeugt werden nur Absätze, Listen, Hervorhebungen und Links.
+     */
+    public static function toHtml(string $source): string
+    {
+        $html = ''; $list = false;
+        foreach (preg_split('/\R/',$source) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') { if ($list) { $html .= '</ul>'; $list = false; } continue; }
+            $line = htmlspecialchars($line,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+            if (str_starts_with($line,'- ')) {
+                if (!$list) { $html .= '<ul>'; $list = true; }
+                $html .= '<li>'.self::inline(mb_substr($line,2)).'</li>';
+                continue;
+            }
+            if ($list) { $html .= '</ul>'; $list = false; }
+            $html .= '<p>'.self::inline($line).'</p>';
+        }
+        return $list ? $html.'</ul>' : $html;
+    }
+
+    /** Hervorhebungen und Links innerhalb einer bereits maskierten Zeile. */
+    private static function inline(string $line): string
+    {
+        $line = (string)preg_replace_callback('~\[([^\[\]]{1,120})\]\((https?://[^\s<>()]{1,500})\)~',static fn(array $match): string => '<a href="'.$match[2].'">'.$match[1].'</a>',$line);
+        $line = (string)preg_replace('~\*\*([^*]{1,300})\*\*~','<strong>$1</strong>',$line);
+        return (string)preg_replace('~\*([^*]{1,300})\*~','<em>$1</em>',$line);
+    }
+
+    /** Anhänge dürfen ausschließlich an einem noch nicht freigegebenen Entwurf hängen. */
+    private function requireDraft(int $campaignId): void
+    {
+        if ($this->db->one("SELECT id FROM newsletter_campaigns WHERE id=? AND state='draft'",[$campaignId]) === null) {
+            throw new \DomainException('Anhänge lassen sich nur an einem Entwurf ändern.');
+        }
+    }
+
+    /** Der Anzeigename stammt vom Client und darf deshalb weder Pfadangaben noch Steuerzeichen enthalten. */
+    private static function fileName(string $name): string
+    {
+        $name = trim((string)preg_replace('/[\x00-\x1F\x7F]/','',basename(str_replace('\\','/',$name))));
+        return $name === '' ? 'Anhang' : mb_substr($name,0,120);
     }
 
     public function save(int $actor,array $values,?int $id): int
@@ -97,8 +187,14 @@ final class Newsletter
                 $token=Crypto::token();
                 $this->db->run('UPDATE newsletter_deliveries SET unsubscribe_hash=? WHERE id=? AND lease_token=?',[Crypto::hash($token),$row['id'],$row['lease_token']]);
                 $link=$this->config->url.'/newsletter/abmelden#token='.$token;
-                $message=(new Email())->from($this->config->newsletterFrom)->replyTo($this->config->mailReplyTo)->to($row['email'])->subject('Corpsakademie · '.$row['subject'])->text($row['body']."\n\n—\nCorpsakademie\nSie erhalten diese Nachricht aufgrund Ihrer bestätigten Newsletter-Anmeldung.\nAbmelden: ".$link."\nImpressum: ".$this->config->url.'/impressum');
+                $text=$row['body']."\n\n—\nCorpsakademie\nSie erhalten diese Nachricht aufgrund Ihrer bestätigten Newsletter-Anmeldung.\nAbmelden: ".$link."\nImpressum: ".$this->config->url.'/impressum';
+                $html=self::toHtml($row['body']).'<p>Corpsakademie<br>Sie erhalten diese Nachricht aufgrund Ihrer bestätigten Newsletter-Anmeldung.<br><a href="'.$link.'">Abmelden</a> · <a href="'.$this->config->url.'/impressum">Impressum</a></p>';
+                // Versendet wird beides: der reine Text als Rückfall und die formatierte Fassung.
+                $message=(new Email())->from($this->config->newsletterFrom)->replyTo($this->config->mailReplyTo)->to($row['email'])->subject('Corpsakademie · '.$row['subject'])->text($text)->html($html);
                 $message->getHeaders()->addIdHeader('Message-ID',$row['message_id']);
+                foreach ($this->db->run('SELECT file_name,storage_path FROM newsletter_attachments WHERE campaign_id=? ORDER BY id',[$row['campaign_id']])->fetchAll() as $attachment) {
+                    $message->attachFromPath($this->config->root.'/public/'.$attachment['storage_path'],$attachment['file_name']);
+                }
                 // Recheck immediately before SMTP. No database transaction is held over the network.
                 $eligible=$this->db->one("SELECT d.id FROM newsletter_deliveries d JOIN newsletter_subscribers s ON s.id=d.subscriber_id JOIN newsletter_campaigns c ON c.id=d.campaign_id WHERE d.id=? AND d.state='sending' AND d.lease_token=? AND d.lease_until>? AND s.state='active' AND s.subscription_version=d.subscription_version AND c.state='queued'",[$row['id'],$row['lease_token'],$this->clock->now()->getTimestamp()]);
                 if ($eligible===null) { $this->finish($row,'cancelled',$results); continue; }

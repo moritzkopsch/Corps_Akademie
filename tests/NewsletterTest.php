@@ -2,10 +2,12 @@
 declare(strict_types=1);
 namespace Corpsakademie\Tests;
 
+use Corpsakademie\Application\Newsletter;
 use Corpsakademie\Container;
 use Corpsakademie\Infrastructure\Config;
 use Corpsakademie\Tests\Support\Fixture;
 use OTPHP\TOTP;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 final class NewsletterTest extends Fixture
 {
@@ -15,6 +17,17 @@ final class NewsletterTest extends Fixture
     }
     private function draft(int $actor): int { return $this->c->newsletter->save($actor,['subject'=>'Impulse für Ihr Corps','body'=>'Gemeinsam weiterkommen.'],null); }
     private function admin(): int { return (int)$this->account('admin@example.test','admin')['id']; }
+
+    /** Stellt eine echte, kleine PDF-Datei als Upload bereit. */
+    private function pdf(string $name): UploadedFile
+    {
+        $path=$this->directory.'/'.bin2hex(random_bytes(4)).'.pdf';
+        file_put_contents($path,'%PDF-1.4'.PHP_EOL.'1 0 obj<</Type/Catalog>>endobj'.PHP_EOL.'%%EOF');
+        return new UploadedFile($path,$name,'application/pdf',null,true);
+    }
+
+    /** Die abgelegten Anhänge liegen im öffentlichen Upload-Ordner. */
+    private function storedPdfs(): array { return glob($this->root.'/public/uploads/newsletter/*.pdf') ?: []; }
 
     public function testQueueSnapshotsOnlyConfirmedSubscribersAndIsNotRepeatable(): void
     {
@@ -121,5 +134,61 @@ final class NewsletterTest extends Fixture
         self::assertStringContainsString('&lt;script&gt;Nachricht&lt;/script&gt;',$preview);
         self::assertStringNotContainsString('<script>Nachricht</script>',$preview);
         self::assertSame(200,$this->request('GET','/admin/newsletter')->getStatusCode());
+    }
+
+    public function testAttachmentsAreLimitedToThreeDraftOnlyAndRemovedOnDetach(): void
+    {
+        $admin=$this->admin(); $id=$this->draft($admin);
+        $before=count($this->storedPdfs());
+        for ($i=1;$i<=3;$i++) { $this->c->newsletter->attach($admin,$id,$this->pdf('Programm '.$i.'.pdf')); }
+        $attachments=$this->c->newsletter->attachments($admin,$id);
+        self::assertCount(3,$attachments);
+        self::assertSame('Programm 1.pdf',$attachments[0]['file_name']);
+        self::assertSame($before+3,count($this->storedPdfs()));
+        try { $this->c->newsletter->attach($admin,$id,$this->pdf('Zu viel.pdf')); self::fail(); }
+        catch (\DomainException $error) { self::assertStringContainsString('höchstens 3',$error->getMessage()); }
+        // Der abgelehnte Upload darf nicht als Datei liegen bleiben.
+        self::assertSame($before+3,count($this->storedPdfs()));
+        $this->c->newsletter->detach($admin,$id,(int)$attachments[0]['id']);
+        self::assertCount(2,$this->c->newsletter->attachments($admin,$id));
+        self::assertFileDoesNotExist($this->root.'/public/'.$attachments[0]['storage_path']);
+        self::assertSame($before+2,count($this->storedPdfs()));
+        // Nach der Freigabe bleibt die Rundmail unveränderlich.
+        $this->subscriber(); $this->c->newsletter->queue($admin,$id,1,true);
+        try { $this->c->newsletter->attach($admin,$id,$this->pdf('Nach Freigabe.pdf')); self::fail(); }
+        catch (\DomainException $error) { self::assertStringContainsString('Entwurf',$error->getMessage()); }
+        self::assertCount(2,$this->c->newsletter->attachments($admin,$id));
+        self::assertSame($before+2,count($this->storedPdfs()));
+        foreach ($this->storedPdfs() as $file) { unlink($file); }
+    }
+
+    public function testFormattingEscapesMarkupAndAllowsOnlyHttpLinks(): void
+    {
+        $html=Newsletter::toHtml("<script>alert(1)</script>\n\n[Böse](javascript:alert(1))\n\n**Fett** und [Termine](https://akademie.example.test/termine)");
+        self::assertStringNotContainsString('<script>',$html);
+        self::assertStringNotContainsString('href="javascript:',$html);
+        self::assertStringContainsString('<strong>Fett</strong>',$html);
+        self::assertStringContainsString('<a href="https://akademie.example.test/termine">Termine</a>',$html);
+    }
+
+    public function testFormattedTextAndAttachmentsAreSentAsMultipart(): void
+    {
+        $admin=$this->admin(); $this->subscriber();
+        $id=$this->c->newsletter->save($admin,['subject'=>'Impulse','body'=>"Hallo **Corps**\n\n- Erster Punkt\n- Zweiter Punkt\n\n[Termine](https://akademie.example.test/termine)"],null);
+        $this->c->newsletter->attach($admin,$id,$this->pdf('Programm.pdf'));
+        $this->c->newsletter->queue($admin,$id,1,true);
+        self::assertSame(1,$this->c->newsletter->work()['submitted']);
+        $message=$this->mailer->messages[0];
+        self::assertIsString($message->getTextBody());
+        self::assertStringContainsString('Hallo **Corps**',$message->getTextBody());
+        $html=$message->getHtmlBody();
+        self::assertIsString($html);
+        self::assertStringContainsString('<strong>Corps</strong>',$html);
+        self::assertStringContainsString('<li>Erster Punkt</li>',$html);
+        self::assertStringContainsString('<a href="https://akademie.example.test/termine">Termine</a>',$html);
+        $attachments=$message->getAttachments();
+        self::assertCount(1,$attachments);
+        self::assertSame('Programm.pdf',$attachments[0]->getFilename());
+        foreach ($this->storedPdfs() as $file) { unlink($file); }
     }
 }
