@@ -86,4 +86,14 @@ final class Accounts
             $this->audit->record('account.disabled', null, $user['public_id']);
         });
     }
+
+    public function enable(int $id): void
+    {
+        $this->db->immediate(function () use ($id): void {
+            $user = $this->find($id);
+            if ($user === null) { throw new \DomainException('Konto nicht gefunden.'); }
+            $this->store->enable($id,$this->clock->now()->getTimestamp());
+            $this->audit->record('account.enabled', null, $user['public_id']);
+        });
+    }
 }

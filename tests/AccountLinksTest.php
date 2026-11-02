@@ -58,6 +58,24 @@ final class AccountLinksTest extends Fixture
         $this->expectException(\DomainException::class); $this->c->links->confirmEmail($token);
     }
 
+    public function testInvitationCreatesAnUnverifiedAccountThatSetsItsOwnPassword(): void
+    {
+        $owner=$this->account('owner@example.test','superadmin');
+        $invited=$this->c->links->invite((int)$owner['id'],'neu@example.test','Neue Person','instructor');
+        self::assertNull($invited['email_verified_at']);
+        self::assertSame(['Referent'],$this->c->accounts->roles((int)$invited['id']));
+        $queued=$this->c->db->one('SELECT * FROM notification_outbox');
+        self::assertSame('account_invitation',$queued['kind']);
+        self::assertSame('queued',$queued['status']);
+        $this->c->mail->work();
+        // Derselbe Link setzt das erste Passwort und bestätigt die E-Mail-Adresse.
+        $this->c->links->reset($this->deliveredToken(),'Ein selbst gewaehltes Passwort 2026!');
+        self::assertNotNull($this->c->accounts->find((int)$invited['id'])['email_verified_at']);
+        self::assertSame('/portal',$this->login('neu@example.test','Ein selbst gewaehltes Passwort 2026!')->headers->get('Location'));
+        $this->expectException(\DomainException::class);
+        $this->c->links->invite((int)$owner['id'],'neu@example.test','Doppelt','instructor');
+    }
+
     public function testPasswordResetRevokesSessionsAndRequiresTheNewPassword(): void
     {
         $user=$this->account(); $this->login();
