@@ -67,7 +67,7 @@ final class IdentityRepository
 
     public function incrementBucket(string $scope,string $hash,int $window,int $expiry): int
     {
-        $this->db->run('INSERT INTO rate_limit_buckets(scope,subject_hmac,window_start,hits,expires_at) VALUES(?,?,?,1,?) ON CONFLICT(scope,subject_hmac,window_start) DO UPDATE SET hits=hits+1',[$scope,$hash,$window,$expiry]);
+        $this->db->run('INSERT INTO rate_limit_buckets(scope,subject_hmac,window_start,hits,expires_at) VALUES(?,?,?,1,?) ON CONFLICT(scope,subject_hmac,window_start) DO UPDATE SET hits=rate_limit_buckets.hits+1',[$scope,$hash,$window,$expiry]);
         return (int)$this->db->run('SELECT hits FROM rate_limit_buckets WHERE scope=? AND subject_hmac=? AND window_start=?',[$scope,$hash,$window])->fetchColumn();
     }
 
