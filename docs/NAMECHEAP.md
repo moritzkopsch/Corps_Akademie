@@ -9,7 +9,7 @@ Die eingecheckte `.cpanel.yml` ruft den Deploymenthelfer für `/home/pushgobt/re
 
 ```bash
 cd /home/pushgobt/repositories/Corps_Akademie
-bash scripts/deploy-cpanel.sh --init --base /home/pushgobt/corps-akademie.r4av.com
+bash scripts/deploy-cpanel.sh --init --base=/home/pushgobt/corps-akademie.r4av.com
 ```
 
 3. Zuvor in cPanel unter **PostgreSQL-Datenbanken** die Datenbank und den Datenbankbenutzer anlegen und den Benutzer der Datenbank zuweisen. Die Tabellen entstehen später durch die Migrationen; manuelle SQL-Schritte entfallen.

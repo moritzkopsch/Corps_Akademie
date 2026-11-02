@@ -1,4 +1,4 @@
 ---
 deployment:
   tasks:
-    - /bin/bash /home/pushgobt/repositories/Corps_Akademie/scripts/deploy-cpanel.sh --base /home/pushgobt/corps-akademie.r4av.com
+    - /bin/bash /home/pushgobt/repositories/Corps_Akademie/scripts/deploy-cpanel.sh --base=/home/pushgobt/corps-akademie.r4av.com
