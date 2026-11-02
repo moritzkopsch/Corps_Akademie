@@ -2,9 +2,11 @@
 declare(strict_types=1);
 namespace Corpsakademie\Http;
 
+use Corpsakademie\Application\Catalog;
 use Corpsakademie\Container;
-use Corpsakademie\Infrastructure\Crypto;
+use Corpsakademie\Infrastructure\{Crypto,Uploads};
 use Symfony\Component\HttpFoundation\{RedirectResponse,Request,Response};
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 final class PublicWebsite
 {
@@ -96,15 +98,36 @@ final class PublicWebsite
         if ($slug!==null && $slug!=='neu' && $existing===null) { return $this->notFound($session); }
         if ($request->isMethod('POST') && $slug===null) { return $this->notFound($session); }
         if ($request->isMethod('POST')) {
+            $stored=[];
             try {
-                if ($section==='seminare') { $this->c->content->saveSeminar((int)$user['id'],$request->request->all(),$existing['slug']??null); }
-                else { $this->c->content->saveReferent((int)$user['id'],$request->request->all(),$existing['slug']??null); }
+                $payload=$request->request->all();
+                if ($section==='seminare') {
+                    $previous=$existing['image_path']??'';
+                    $payload['image_path']=$this->acceptUpload($request->files->get('image'),'seminars','image',$previous,$stored);
+                    $this->c->content->saveSeminar((int)$user['id'],$payload,$existing['slug']??null);
+                    if ($payload['image_path']!==$previous) { Uploads::remove($previous,$this->c->config->root); }
+                } else {
+                    $this->c->content->saveReferent((int)$user['id'],$payload,$existing['slug']??null);
+                }
                 return new RedirectResponse('/admin/'.$section,303);
-            } catch (\DomainException $exception) { $error=$exception->getMessage(); }
+            } catch (\DomainException $exception) {
+                foreach ($stored as $path) { Uploads::remove($path,$this->c->config->root); }
+                $error=$exception->getMessage();
+            }
         }
         $values=$existing??[];
         if ($request->isMethod('POST')) { $values=$this->values($request)+$values; }
-        return $show(['section'=>$section,'editing'=>$slug!==null,'values'=>$values,'error'=>$error,'categories'=>$this->c->catalog->categories(),'seminars'=>$this->c->catalog->seminars(false),'referents'=>$this->c->catalog->referents(false),'assigned'=>$existing===null?[]:array_column($this->c->catalog->referents(false,(int)$existing['id']),'id')],$error===null?200:422);
+        $currentId=$existing['id']??null;
+        return $show(['section'=>$section,'editing'=>$slug!==null,'values'=>$values,'error'=>$error,'categories'=>$this->c->catalog->categories(),'seminars'=>$this->c->catalog->seminars(false),'referents'=>$this->c->catalog->referents(false),'assigned'=>$existing===null?[]:array_column($this->c->catalog->referents(false,(int)$existing['id']),'id'),'variants'=>Catalog::DURATION_OPTIONS,'featured_limit'=>Catalog::FEATURED_LIMIT,'featured_seminars'=>array_values(array_filter($this->c->catalog->seminars(false),static fn(array $seminar): bool=>$seminar['featured']===1 && $seminar['id']!==$currentId))],$error===null?200:422);
+    }
+
+    /** Legt eine hochgeladene Datei ab, ohne die bisherige zu löschen; erst ein erfolgreiches Speichern ersetzt sie. */
+    private function acceptUpload(?UploadedFile $file, string $folder, string $type, string $previous, array &$stored): string
+    {
+        $path=Uploads::store($file,$folder,$type,$this->c->config->root);
+        if ($path==='') { return $previous; }
+        $stored[]=$path;
+        return $path;
     }
 
     private function notFound(Session $session): Response { return ($this->render)('error.twig',$session,['status'=>404,'title'=>'Nicht gefunden','message'=>'Dieser Eintrag ist nicht verfügbar.'],404); }
@@ -117,10 +140,10 @@ final class PublicWebsite
 
     private function values(Request $request): array
     {
-        $values=array_fill_keys(['email','name','corps','role','phone','message','seminar','participants','date','location','format','token','state','slug','title','category_id','summary','description','audience','duration','status','featured','row_version','headline','biography','benefits','expertise'],'');
-        $values['referent_mode']='recommend'; $values['submission']=Crypto::token(); $values['referents']=[];
+        $values=array_fill_keys(['email','name','corps','role','phone','message','seminar','participants','date','location','format','token','state','slug','title','category_id','summary','description','audience','duration','status','featured','row_version','headline','biography','benefits','expertise','image_path'],'');
+        $values['referent_mode']='recommend'; $values['submission']=Crypto::token(); $values['referents']=[]; $values['duration_options']=[];
         foreach ($request->request->all() as $key=>$value) {
-            if ($key==='referents' && is_array($value)) { $values[$key]=array_values(array_filter($value,'is_string')); }
+            if (in_array($key,['referents','duration_options'],true) && is_array($value)) { $values[$key]=array_values(array_filter($value,'is_string')); }
             elseif (is_string($value)) { $values[$key]=$value; }
         }
         return $values;

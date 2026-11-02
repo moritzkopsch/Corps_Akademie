@@ -2113,3 +2113,32 @@ svg {
     padding: 12px 0;
   }
 }
+.card-media {
+  margin: -28px -28px 22px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+.card-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.detail-media {
+  margin: 26px 0 30px;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.detail-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+}
+@media (max-width: 900px) {
+  .detail-heading {
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+}

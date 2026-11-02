@@ -48,7 +48,9 @@ final class Application
                 $response->headers->set('Allow',implode(', ',$methods));
                 return $this->headers($response);
             }
-            if ((int)$request->headers->get('Content-Length','0')>32768) { return $this->headers($this->error(413,'Eingabe zu groß','Bitte kürze deine Eingaben.')); }
+            // Verwaltungsformulare übertragen Bilder oder PDFs, alle übrigen Aufrufe bleiben knapp begrenzt.
+            $inputLimit = str_starts_with($path,'/admin/') ? 8388608 : 32768;
+            if ((int)$request->headers->get('Content-Length','0')>$inputLimit) { return $this->headers($this->error(413,'Eingabe zu groß','Bitte kürze deine Eingaben.')); }
             $ip = $request->getClientIp() ?? 'unknown';
             if (!$this->c->limits->attempt('http.ip',$ip,120,60)) { return $this->headers($this->error(429,'Bitte kurz warten','Zu viele Aufrufe. Bitte in einer Minute erneut versuchen.')); }
             $session = $this->c->sessions->load($request);

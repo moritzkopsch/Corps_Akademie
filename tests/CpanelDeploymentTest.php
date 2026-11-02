@@ -203,7 +203,23 @@ final class CpanelDeploymentTest extends TestCase
         self::assertFileDoesNotExist($this->webroot.'/.env'); self::assertDirectoryDoesNotExist($this->webroot.'/vendor');
         self::assertFileDoesNotExist($this->base.'/shared/maintenance.flag');
         self::assertDirectoryExists($this->base.'/shared/storage');
+        self::assertDirectoryExists($this->base.'/shared/uploads');
+        $this->assertUploadsArePersistent($deployment);
         $this->assertMigrated($database);
+    }
+
+    // Hochgeladene Medien müssen außerhalb des Releases liegen, damit sie das nächste Deployment überleben.
+    private function assertUploadsArePersistent(Deployment $deployment): void
+    {
+        $target=realpath($this->base).'/shared/uploads';
+        self::assertTrue(is_link($this->webroot.'/uploads'));
+        self::assertSame($target,readlink($this->webroot.'/uploads'));
+        self::assertSame($target,readlink($this->base.'/current/public/uploads'));
+        file_put_contents($this->webroot.'/uploads/keep.txt','persistent');
+        $deployment->deploy();
+        self::assertSame($target,readlink($this->webroot.'/uploads'));
+        self::assertSame($target,readlink($this->base.'/current/public/uploads'));
+        self::assertSame('persistent',file_get_contents($this->webroot.'/uploads/keep.txt'));
     }
 
     public function testFailureAfterMigrationStaysInMaintenanceAndDoesNotSwitchRelease(): void
