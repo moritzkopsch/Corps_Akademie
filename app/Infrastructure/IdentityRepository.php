@@ -53,6 +53,11 @@ final class IdentityRepository
         $this->db->run("UPDATE users SET status='disabled',disabled_at=?,updated_at=?,row_version=row_version+1 WHERE id=?",[$now,$now,$id]);
     }
 
+    public function enable(int $id,int $now): void
+    {
+        $this->db->run("UPDATE users SET status='active',disabled_at=NULL,updated_at=?,row_version=row_version+1 WHERE id=?",[$now,$id]);
+    }
+
     public function replacePasswordHash(int $id,string $hash): void { $this->db->run('UPDATE users SET password_hash=? WHERE id=?',[$hash,$id]); }
 
     public function resetPassword(int $id,string $hash,int $now): void
@@ -139,7 +144,7 @@ final class IdentityRepository
 
     public function overview(): array
     {
-        return $this->db->run("SELECT u.public_id,u.name,u.email,u.status,u.email_verified_at,string_agg(r.label, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id GROUP BY u.id ORDER BY u.created_at DESC,u.id DESC LIMIT 100")->fetchAll();
+        return $this->db->run("SELECT u.id,u.public_id,u.name,u.email,u.status,u.email_verified_at,string_agg(r.label, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id GROUP BY u.id ORDER BY u.created_at DESC,u.id DESC LIMIT 100")->fetchAll();
     }
 
     public function statistics(): array

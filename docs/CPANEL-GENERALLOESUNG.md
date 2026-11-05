@@ -18,7 +18,7 @@ Drei getrennte Bereiche, verbunden über einen umschaltbaren Symlink:
 ```
 $CHECKOUT   →  reiner Git-Checkout, niemals Document Root, enthält keine Daten
 $BASE       →  releases/<commit>-<rand>/, shared/, current -> releases/..., current-next-*
-$WEBROOT    →  nur index.php, .htaccess und assets/
+$WEBROOT    →  nur index.php, .htaccess, assets/ und uploads -> shared/uploads
 ```
 
 - **Atomar:** Jedes Deployment baut ein vollständiges neues Release und schaltet erst am Ende
@@ -27,6 +27,9 @@ $WEBROOT    →  nur index.php, .htaccess und assets/
   Wechsel auf ein älteres Release.
 - **Getrennt:** `.env`, `storage/`, Logs und Sicherungen liegen ausschließlich unter `$BASE/shared`
   und sind über den Webroot nicht erreichbar. Jedes Release bekommt `shared/.env` als Symlink.
+- **Dauerhafte Medien:** Hochgeladene Bilder und PDFs liegen in `shared/uploads` außerhalb der
+  Releases. Sowohl `release/public/uploads` als auch `$WEBROOT/uploads` sind Symlinks dorthin,
+  damit Uploads kein Deployment verlieren (siehe 3.3, Schritte 4 und 9).
 - **Serialisiert:** `shared/runtime.lock` wird von HTTP-Einstiegspunkt, CLI-Wrapper und Deployment
   gemeinsam über `flock` gehalten. Während eines Deployments bedient die Website 503 statt Fehler.
 - **Selbstprüfend:** Vor der Aktivierung werden CLI-PHP, Web-PHP, HTTPS, Datenbanktreiber und
@@ -52,6 +55,7 @@ $BASE/
     maintenance.flag            # existiert nur während eines Deployments
     last-deployment.json        # aktiver Commit
     storage/{logs,backups}      # persistent, überlebt jedes Release
+    uploads/                    # 0755, öffentliche Medien (Bilder, PDFs), persistent
     deployment-backups/         # getarnte Sicherung des alten Webroots
   releases/<commit12>-<rand>/   # vollständige Releases
   current -> releases/...       # aktives Release
@@ -60,6 +64,7 @@ $WEBROOT/                       # Document Root
   index.php                     # generierter Einstiegspunkt
   .htaccess                     # markierter Regelblock
   assets/                       # nur css/js/svg/png/jpg/jpeg/webp/ico/woff/woff2
+  uploads -> $BASE/shared/uploads
 ```
 
 ## 3. Bausteine
@@ -112,7 +117,8 @@ keine Symlinks auf `index.php`/`.htaccess`/`assets`, `deploy.json`-Pfade absolut
 1. `git diff --quiet` und `git diff --cached --quiet` → **sauberer Worktree Pflicht**.
 2. `git rev-parse HEAD` → Release-Name `releases/<commit12>-<rand>`.
 3. `git archive` → `tar -xf` in das neue Release (kein `.git`, keine Daten).
-4. `shared/.env` als Symlink ins Release.
+4. `shared/.env` als Symlink ins Release; `public/uploads` im Release wird – falls vorhanden –
+   entfernt und als Symlink auf `shared/uploads` angelegt (dauerhafte Medien).
 5. `composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction`, dann
    `composer check-platform-reqs --no-dev`.
 6. Konfiguration im Release prüfen (`APP_ENV=production`, `APP_STORAGE_PATH` = `$BASE/shared/storage`).
@@ -120,7 +126,8 @@ keine Symlinks auf `index.php`/`.htaccess`/`assets`, `deploy.json`-Pfade absolut
    `https://APP_URL/<sonde>` per cURL (ohne Redirects, mit Zertifikatsprüfung), validiert Nonce,
    PHP-Version, `pdo_pgsql`, HTTPS-Erkennung und Argon2id – und löscht die Datei wieder.
 8. `flock` auf `runtime.lock` (max. 45 s warten) → exklusiv für die Aktivierung.
-9. Webroot und Assets sichern (`shared/deployment-backups/public-*.tar`), dann `maintenance.flag`
+9. Webroot und Assets sichern (`shared/deployment-backups/public-*.tar`), `$WEBROOT/uploads`
+   als Symlink auf `shared/uploads` veröffentlichen (atomar über `rename`), dann `maintenance.flag`
    setzen, `index.php` und `.htaccess` atomar schreiben, Assets verteilen.
 10. `php bin/console db:migrate`, dann `doctor` – läuft im **neuen** Release.
 11. `current`-Symlink über `current-next-<rand>` + `rename` umschalten,
@@ -205,6 +212,9 @@ Wichtig:
   wird mit Daten und Konfiguration gesichert, nie in Git.
 - **Rollback:** `current` auf ein älteres Release zeigen lassen. Nach einer Datenbankmigration nur
   zusammen mit der passenden Datensicherung – es gibt keinen automatischen Code-Rollback.
+- **Uploads sichern:** `shared/uploads` gehört in jede Sicherung. Im Webroot darf **vor** dem ersten
+  Deployment kein eigener `uploads`-Ordner liegen; das Deployment lehnt das sonst ab, damit keine
+  Bilder überschrieben werden.
 
 ## 6. Betrieb und Cron
 
@@ -213,6 +223,7 @@ Nur über den Wrapper, damit die gemeinsame Sperre greift:
 ```text
 */5 * * * * /usr/local/bin/php $BASE/current/scripts/cpanel-console.php --base=$BASE mail:work --limit=3 --if-enabled
 1-59/5 * * * * /usr/local/bin/php $BASE/current/scripts/cpanel-console.php --base=$BASE newsletter:work --limit=1 --if-enabled
+13 6 * * * /usr/local/bin/php $BASE/current/scripts/cpanel-console.php --base=$BASE calendar:remind --limit=20 --if-enabled
 ```
 
 Den absoluten PHP-Pfad verwenden, dessen Erweiterungen geprüft sind. `--if-enabled` beendet bei
@@ -238,6 +249,7 @@ Den absoluten PHP-Pfad verwenden, dessen Erweiterungen geprüft sind. `--if-enab
 
 - [ ] PHP-Patchstand und alle Erweiterungen in CLI **und** Web geprüft (`doctor`, Web-Sonde)
 - [ ] `shared/` außerhalb des Webroots, `chmod 600` auf `.env`, kein `CHANGE-ME` mehr
+- [ ] `shared/uploads` existiert (0755), `$WEBROOT/uploads` ist der Symlink darauf, Uploads in der Sicherung
 - [ ] HTTPS-`APP_URL` zeigt auf den geprüften Webroot
 - [ ] Migrationen angewandt, `doctor` ohne `[FEHLER]`
 - [ ] SMTP-Anmeldung und echte Zustellung geprüft (SPF/DKIM)

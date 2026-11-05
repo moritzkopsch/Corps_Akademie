@@ -24,6 +24,8 @@ final class Deployment
             throw new \RuntimeException('Im Checkout liegt bereits eine Konfiguration. Zuerst vorhandenen Schlüssel sichern und zusammen übernehmen; es wurde kein neuer Schlüssel angelegt.');
         }
         foreach ([$this->base,$shared,$shared.'/storage',$shared.'/storage/logs',$shared.'/storage/backups',$this->base.'/releases'] as $directory) { $this->directory($directory,0700); }
+        // Öffentliche Medien liegen bewusst außerhalb der Releases und werden mit 0755 ausgeliefert.
+        $this->directory($shared.'/uploads',0755);
         $this->base=realpath($this->base);
         $shared=$this->base.'/shared';
         if (!is_file($shared.'/deploy.json')) {
@@ -75,7 +77,7 @@ final class Deployment
         if ((fileperms($shared.'/.env')&0077)!==0) { throw new \RuntimeException('shared/.env benötigt private Dateirechte, beispielsweise chmod 600.'); }
         $contents=file_get_contents($shared.'/.env');
         if (stripos($contents,'CHANGE-ME')!==false) { throw new \RuntimeException('shared/.env enthält noch Platzhalter. APP_URL, SMTP und Absender zuerst eintragen.'); }
-        foreach ([$shared.'/storage',$this->base.'/releases'] as $directory) {
+        foreach ([$shared.'/storage',$shared.'/uploads',$this->base.'/releases'] as $directory) {
             if (!is_dir($directory) || !is_writable($directory)) { throw new \RuntimeException('Private Speicherverzeichnisse fehlen oder sind nicht beschreibbar. --init beziehungsweise Dateirechte prüfen.'); }
         }
         if (!is_file($shared.'/runtime.lock') || !is_writable($shared.'/runtime.lock')) { throw new \RuntimeException('shared/runtime.lock fehlt oder ist nicht beschreibbar. --init ausführen.'); }
@@ -109,6 +111,11 @@ final class Deployment
         $this->command(['tar','-xf',$archive,'-C',$release],$this->source);
         unlink($archive);
         if (!symlink($this->base.'/shared/.env',$release.'/.env')) { throw new \RuntimeException('Private Konfiguration konnte nicht mit dem Release verbunden werden.'); }
+        // Hochgeladene Bilder und Dateien überleben das Deployment nur außerhalb des Releases.
+        $this->directory($this->base.'/shared/uploads',0755);
+        $releaseUploads=$release.'/public/uploads';
+        if (is_dir($releaseUploads) && !is_link($releaseUploads)) { $this->removeDirectory($releaseUploads); }
+        if (!is_link($releaseUploads) && !symlink($this->base.'/shared/uploads',$releaseUploads)) { throw new \RuntimeException('Der Upload-Ordner konnte nicht mit dem Release verbunden werden.'); }
         $this->command([PHP_BINARY,$settings['composer'],'install','--no-dev','--prefer-dist','--optimize-autoloader','--no-interaction'],$release);
         $this->command([PHP_BINARY,$settings['composer'],'check-platform-reqs','--no-dev'],$release);
         $config=$this->applicationConfig($release);
@@ -125,6 +132,7 @@ final class Deployment
         }
         try {
             $this->backupPublic($settings['webroot']);
+            $this->publishUploads($settings['webroot']);
             $this->atomicWrite($this->base.'/shared/maintenance.flag',"Deployment ".$revision."\n",0600);
             // First install also gets the maintenance-aware entry before any DB work.
             $this->atomicWrite($settings['webroot'].'/index.php',$entry,0644);
@@ -216,6 +224,32 @@ final class Deployment
         $directory=$this->base.'/shared/deployment-backups'; $this->directory($directory,0700);
         $path=$directory.'/public-'.gmdate('Ymd-His').'-'.bin2hex(random_bytes(4)).'.tar';
         $this->command(['tar','-cf',$path,'-C',$webroot,...$names],$this->source); chmod($path,0600);
+    }
+
+    /** Verbindet den öffentlichen Webroot mit der dauerhaften Upload-Ablage außerhalb der Releases. */
+    private function publishUploads(string $webroot): void
+    {
+        $target=$this->base.'/shared/uploads';
+        $this->directory($target,0755);
+        $link=$webroot.'/uploads';
+        if (is_link($link)) {
+            if (readlink($link)===$target) { return; }
+            if (!unlink($link)) { throw new \RuntimeException('Der bisherige Upload-Verweis konnte nicht ersetzt werden.'); }
+        } elseif (file_exists($link)) {
+            throw new \RuntimeException('Im Webroot liegt bereits ein eigener Ordner uploads. Zuerst sichern und aus dem Webroot entfernen.');
+        }
+        $temporary=$webroot.'/.corps-uploads-'.bin2hex(random_bytes(6));
+        if (!symlink($target,$temporary) || !rename($temporary,$link)) {
+            if (is_link($temporary)) { unlink($temporary); }
+            throw new \RuntimeException('Der Upload-Ordner konnte im Webroot nicht veröffentlicht werden.');
+        }
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        $iterator=new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory,\FilesystemIterator::SKIP_DOTS),\RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($iterator as $item) { $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname()); }
+        if (!rmdir($directory)) { throw new \RuntimeException('Vorhandener Upload-Ordner im Release konnte nicht entfernt werden.'); }
     }
 
     private function command(array $command, string $directory): void

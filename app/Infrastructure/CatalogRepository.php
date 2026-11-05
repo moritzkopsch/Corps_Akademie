@@ -44,14 +44,19 @@ final class CatalogRepository
         return $row===null?null:$this->referentProjection($row);
     }
 
+    public function featuredCount(?int $exceptId = null): int
+    {
+        return (int)$this->db->run('SELECT count(*) FROM seminars WHERE featured=1'.($exceptId===null?'':' AND id<>?'),$exceptId===null?[]:[$exceptId])->fetchColumn();
+    }
+
     public function saveSeminar(array $data, ?array $existing, array $referentIds, int $now): int
     {
-        $params=[$data['slug'],$data['title'],$data['category_id'],$data['summary'],$data['description'],json_encode($data['benefits'],JSON_THROW_ON_ERROR),$data['audience'],$data['duration'],$data['format'],$data['status'],$data['featured'],$now];
+        $params=[$data['slug'],$data['title'],$data['category_id'],$data['summary'],$data['description'],json_encode($data['benefits'],JSON_THROW_ON_ERROR),$data['audience'],$data['duration'],$data['format'],$data['status'],$data['featured'],$data['image_path'],json_encode($data['duration_options'],JSON_THROW_ON_ERROR),$now];
         if ($existing===null) {
             // PostgreSQL liefert die erzeugte Identität nur über RETURNING zurück.
-            $id=(int)$this->db->run('INSERT INTO seminars(slug,title,category_id,summary,description,benefits_json,audience,duration,format,status,featured,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
+            $id=(int)$this->db->run('INSERT INTO seminars(slug,title,category_id,summary,description,benefits_json,audience,duration,format,status,featured,image_path,duration_options,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
         } else {
-            $changed=$this->db->run('UPDATE seminars SET slug=?,title=?,category_id=?,summary=?,description=?,benefits_json=?,audience=?,duration=?,format=?,status=?,featured=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
+            $changed=$this->db->run('UPDATE seminars SET slug=?,title=?,category_id=?,summary=?,description=?,benefits_json=?,audience=?,duration=?,format=?,status=?,featured=?,image_path=?,duration_options=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
             if ($changed!==1) { throw new \DomainException('Das Seminar wurde zwischenzeitlich geändert. Bitte die Seite neu öffnen.'); }
             $id=(int)$existing['id'];
         }
@@ -62,11 +67,11 @@ final class CatalogRepository
 
     public function saveReferent(array $data, ?array $existing, int $now): int
     {
-        $params=[$data['slug'],$data['name'],$data['headline'],$data['corps'],$data['biography'],json_encode($data['expertise'],JSON_THROW_ON_ERROR),$data['status'],$now];
+        $params=[$data['slug'],$data['name'],$data['headline'],$data['corps'],$data['biography'],json_encode($data['expertise'],JSON_THROW_ON_ERROR),$data['status'],$data['image_path'],$data['linkedin_url'],$data['cv_path'],json_encode($data['corps_memberships'],JSON_THROW_ON_ERROR),json_encode($data['career'],JSON_THROW_ON_ERROR),$now];
         if ($existing===null) {
-            return (int)$this->db->run('INSERT INTO referent_profiles(slug,name,headline,corps,biography,expertise_json,status,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
+            return (int)$this->db->run('INSERT INTO referent_profiles(slug,name,headline,corps,biography,expertise_json,status,image_path,linkedin_url,cv_path,corps_memberships,career_json,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
         }
-        $changed=$this->db->run('UPDATE referent_profiles SET slug=?,name=?,headline=?,corps=?,biography=?,expertise_json=?,status=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
+        $changed=$this->db->run('UPDATE referent_profiles SET slug=?,name=?,headline=?,corps=?,biography=?,expertise_json=?,status=?,image_path=?,linkedin_url=?,cv_path=?,corps_memberships=?,career_json=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
         if ($changed!==1) { throw new \DomainException('Das Profil wurde zwischenzeitlich geändert. Bitte die Seite neu öffnen.'); }
         return (int)$existing['id'];
     }
@@ -77,6 +82,9 @@ final class CatalogRepository
         $row['id']=(int)$row['id']; $row['category_id']=(int)$row['category_id'];
         $row['featured']=(int)$row['featured']; $row['row_version']=(int)$row['row_version'];
         $row['benefits']=json_decode($row['benefits_json'],true,512,JSON_THROW_ON_ERROR);
+        $row['duration_options']=json_decode($row['duration_options'],true,512,JSON_THROW_ON_ERROR);
+        // Die Textspalte duration bleibt für bestehende Datensätze erhalten und wird aus der Auswahl abgeleitet.
+        if ($row['duration_options']!==[]) { $row['duration']=implode(' / ',$row['duration_options']); }
         return $row;
     }
 
@@ -86,6 +94,11 @@ final class CatalogRepository
         unset($row['user_id']);
         $row['id']=(int)$row['id']; $row['row_version']=(int)$row['row_version'];
         $row['expertise']=json_decode($row['expertise_json'],true,512,JSON_THROW_ON_ERROR);
+        $row['career']=json_decode($row['career_json'],true,512,JSON_THROW_ON_ERROR);
+        $memberships=json_decode($row['corps_memberships'],true,512,JSON_THROW_ON_ERROR);
+        // Altdaten ohne strukturierte Mitgliedschaften werden für Formular und Anzeige aufgeteilt.
+        $row['corps_memberships']=$memberships===[]&&$row['corps']!==''?array_values(array_filter(array_map('trim',explode('·',$row['corps'])))):$memberships;
+        if ($row['corps_memberships']!==[]) { $row['corps']=implode(' · ',$row['corps_memberships']); }
         $words=preg_split('/\s+/u',$row['name']);
         $row['initials']=mb_substr($words[0],0,1).mb_substr($words[count($words)-1],0,1);
         return $row;

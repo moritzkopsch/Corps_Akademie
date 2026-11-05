@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace Corpsakademie\Infrastructure;
 
+use Corpsakademie\Application\Catalog;
+
 final class CatalogSeeder
 {
     public static function seed(Database $db, CatalogRepository $catalog, string $root, int $now, bool $presentation = false): array
@@ -21,7 +23,9 @@ final class CatalogSeeder
                 $categoryId=(int)$db->one('SELECT id FROM seminar_categories WHERE slug=?',[$category])['id'];
                 $ids=[];
                 foreach ($referents as $referent) { $ids[]=(int)$catalog->referent($referent,false)['id']; }
-                $catalog->saveSeminar(['slug'=>$slug,'title'=>$title,'category_id'=>$categoryId,'summary'=>$summary,'description'=>$description,'benefits'=>$benefits,'audience'=>$audience,'duration'=>$duration,'format'=>'Präsenz / nach Vereinbarung','status'=>'published','featured'=>$featured],null,$ids,$now);
+                // Die Dauerauswahl ist die maßgebliche Angabe; der Freitext der Altdaten bleibt als Textspalte erhalten.
+                $options=in_array($duration,Catalog::DURATION_OPTIONS,true)?[$duration]:[];
+                $catalog->saveSeminar(['slug'=>$slug,'title'=>$title,'category_id'=>$categoryId,'summary'=>$summary,'description'=>$description,'benefits'=>$benefits,'audience'=>$audience,'duration'=>$duration,'duration_options'=>$options,'image_path'=>'','format'=>'Präsenz / nach Vereinbarung','status'=>'published','featured'=>$featured],null,$ids,$now);
                 $counts['seminars']++;
             }
             return $counts;

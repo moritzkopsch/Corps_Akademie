@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace Corpsakademie;
 
-use Corpsakademie\Application\{AccountLinks,Catalog,Newsletter,PublicRequests};
+use Corpsakademie\Application\{AccountLinks,Calendar,Catalog,Newsletter,PublicRequests};
 use Corpsakademie\Domain\Identity\{Accounts,Authentication,Mfa,RateLimiter,Tokens};
 use Corpsakademie\Http\SessionStore;
 use Corpsakademie\Infrastructure\{Audit,CatalogRepository,Config,Crypto,Database,DisabledMailer,IdentityRepository,InquiryRepository,MailOutbox,PublicMailOutbox,SystemClock};
@@ -30,6 +30,7 @@ final class Container
     public readonly PublicMailOutbox $publicMail;
     public readonly PublicRequests $publicRequests;
     public readonly Newsletter $newsletter;
+    public readonly Calendar $calendar;
 
     public function __construct(public readonly Config $config, ?ClockInterface $clock = null, ?MailerInterface $mailer = null)
     {
@@ -63,5 +64,6 @@ final class Container
         $this->content = new Catalog($this->db,$this->catalog,$this->accounts,$this->audit,$this->clock);
         $this->publicMail = new PublicMailOutbox($this->db,$config,$this->crypto,$this->clock,$mailer);
         $this->publicRequests = new PublicRequests($this->db,$this->catalog,new InquiryRepository($this->db),$this->publicMail,$this->crypto,$config,$this->limits,$this->accounts,$this->audit,$this->clock);
+        $this->calendar = new Calendar($this->db,$config,$this->accounts,$this->audit,$this->clock,$mailer);
     }
 }

@@ -92,6 +92,17 @@ $console->add((new Command('newsletter:work'))->setDescription('Freigegebene New
         $result=$c->newsletter->work($limit);
         $output->writeln(json_encode($result,JSON_THROW_ON_ERROR)); return $result['ambiguous']>0?1:0;
     }));
+$console->add((new Command('calendar:remind'))->setDescription('Referenten erinnern, deren nächste sechs Monate nicht geplant sind.')
+    ->addOption('limit',null,InputOption::VALUE_REQUIRED,'Maximal 20 Nachrichten pro Lauf','20')
+    ->addOption('if-enabled',null,InputOption::VALUE_NONE,'Bei deaktiviertem Versand ohne Fehler beenden')
+    ->setCode(static function(InputInterface $input,OutputInterface $output) use ($container): int {
+        $limit=filter_var($input->getOption('limit'),FILTER_VALIDATE_INT);
+        if ($limit===false || $limit<1 || $limit>20) { throw new RuntimeException('Limit muss zwischen 1 und 20 liegen.'); }
+        $c=$container();
+        if (!$c->config->mailEnabled && $input->getOption('if-enabled')) { $output->writeln('Mailversand deaktiviert.'); return 0; }
+        $result=$c->calendar->remind($limit);
+        $output->writeln(json_encode($result,JSON_THROW_ON_ERROR)); return $result['ambiguous']>0?1:0;
+    }));
 $console->add((new Command('db:backup'))->setDescription('Konsistente lokale Datenbanksicherung außerhalb des Webroots erstellen.')
     ->setCode(static function(InputInterface $input,OutputInterface $output) use ($container): int {
         $c=$container(); $now=time(); $path=$c->db->backup();

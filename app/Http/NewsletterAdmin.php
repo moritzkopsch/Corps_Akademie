@@ -2,8 +2,10 @@
 declare(strict_types=1);
 namespace Corpsakademie\Http;
 
+use Corpsakademie\Application\Newsletter;
 use Corpsakademie\Container;
 use Symfony\Component\HttpFoundation\{Request,Response,RedirectResponse};
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 final class NewsletterAdmin
 {
@@ -29,7 +31,13 @@ final class NewsletterAdmin
                     $version=filter_var($data['row_version']??null,FILTER_VALIDATE_INT);
                     $this->c->newsletter->queue((int)$user['id'],$id,$version===false?0:$version,($data['confirm']??null)==='1');
                 } elseif ($action==='cancel' && $id!==null) { $this->c->newsletter->cancel((int)$user['id'],$id); }
-                else { throw new \DomainException('Bitte eine gültige Aktion wählen.'); }
+                elseif ($action==='attach' && $id!==null) {
+                    $file=$request->files->get('attachment');
+                    $this->c->newsletter->attach((int)$user['id'],$id,$file instanceof UploadedFile?$file:null);
+                } elseif ($action==='detach' && $id!==null) {
+                    $attachment=filter_var($data['attachment_id']??null,FILTER_VALIDATE_INT);
+                    $this->c->newsletter->detach((int)$user['id'],$id,$attachment===false?0:$attachment);
+                } else { throw new \DomainException('Bitte eine gültige Aktion wählen.'); }
                 return new RedirectResponse('/admin/newsletter/'.$id,303);
             } catch (\DomainException $exception) {
                 $error=$exception->getMessage();
@@ -38,6 +46,9 @@ final class NewsletterAdmin
         }
         return ($this->render)('newsletter-admin.twig',$session,array_merge($this->c->newsletter->overview((int)$user['id']),[
             'editing'=>$part!==null,'campaign'=>$campaign,'values'=>$values,'error'=>$error,'newsletter_from'=>$this->c->config->newsletterFrom,'reply_to'=>$this->c->config->mailReplyTo,
+            'attachments'=>$campaign===null?[]:$this->c->newsletter->attachments((int)$user['id'],(int)$id),
+            'body_html'=>$campaign===null?'':Newsletter::toHtml($campaign['body']),
+            'attachment_limit'=>Newsletter::MAX_ATTACHMENTS,
         ]),$error===null?200:422);
     }
 }

@@ -8,16 +8,25 @@ use Psr\Clock\ClockInterface;
 
 final class Catalog
 {
+    /** Auswahlmöglichkeiten für die Dauer eines Seminars. */
+    public const DURATION_OPTIONS = ['1 Tag','2 Tage','3 Tage','4 Tage','5 Tage oder mehr','Nach Absprache'];
+
+    /** So viele Seminare darf die Startseite höchstens hervorheben. */
+    public const FEATURED_LIMIT = 6;
+
     public function __construct(private readonly Database $db, private readonly CatalogRepository $store, private readonly Accounts $accounts, private readonly Audit $audit, private readonly ClockInterface $clock) {}
 
     public function saveSeminar(int $actor, array $values, ?string $existingSlug = null): string
     {
         $this->authorize($actor);
         $data=[];
-        foreach (['slug'=>100,'title'=>140,'summary'=>350,'description'=>6000,'audience'=>250,'duration'=>80,'format'=>100] as $key=>$max) { $data[$key]=self::text($values,$key,$max); }
+        foreach (['slug'=>100,'title'=>140,'summary'=>350,'description'=>6000,'audience'=>250,'format'=>100] as $key=>$max) { $data[$key]=self::text($values,$key,$max); }
         $data['benefits']=self::lines($values,'benefits');
         $data['status']=self::status($values); $data['category_id']=(int)($values['category_id']??0);
         $data['featured']=($values['featured']??'')==='1'?1:0;
+        $data['duration_options']=self::durationOptions($values);
+        $data['duration']=implode(' / ',$data['duration_options']);
+        $data['image_path']=self::mediaPath($values['image_path']??'');
         $data['row_version']=(int)($values['row_version']??0);
         self::slug($data['slug']);
         if (!in_array($data['category_id'],array_column($this->store->categories(),'id'),true)) { throw new \DomainException('Bitte eine gültige Kategorie wählen.'); }
@@ -32,6 +41,9 @@ final class Catalog
             if ($existingSlug!==null && $existing===null) { throw new \DomainException('Seminar nicht gefunden.'); }
             $duplicate=$this->store->seminar($data['slug'],false);
             if ($duplicate!==null && ($existing===null || $duplicate['id']!==$existing['id'])) { throw new \DomainException('Diese Seitenadresse ist bereits vergeben.'); }
+            if ($data['featured']===1 && $this->store->featuredCount($existing===null?null:(int)$existing['id'])>=self::FEATURED_LIMIT) {
+                throw new \DomainException('Es sind bereits '.self::FEATURED_LIMIT.' Seminare hervorgehoben. Bitte zuerst eine Hervorhebung entfernen.');
+            }
             $this->store->saveSeminar($data,$existing,$ids,$this->clock->now()->getTimestamp());
             $this->audit->record('content.seminar_saved',$actor,$data['slug'],['status'=>$data['status']],'seminar');
             return $data['slug'];
@@ -42,8 +54,14 @@ final class Catalog
     {
         $this->authorize($actor); $data=[];
         foreach (['slug'=>100,'name'=>140,'headline'=>180,'biography'=>6000] as $key=>$max) { $data[$key]=self::text($values,$key,$max); }
-        $data['corps']=self::text($values,'corps',250,false);
+        $data['corps_memberships']=self::bullets($values,'corps_memberships',10);
+        // Die Textspalte corps bleibt für Altdaten erhalten und wird aus den Mitgliedschaften abgeleitet.
+        $data['corps']=$data['corps_memberships']===[]?self::text($values,'corps',250,false):implode(' · ',$data['corps_memberships']);
+        $data['career']=self::bullets($values,'career',12);
         $data['expertise']=self::lines($values,'expertise'); $data['status']=self::status($values);
+        $data['linkedin_url']=self::linkedin($values['linkedin_url']??'');
+        $data['image_path']=self::mediaPath($values['image_path']??'');
+        $data['cv_path']=self::mediaPath($values['cv_path']??'');
         $data['row_version']=(int)($values['row_version']??0); self::slug($data['slug']);
         return $this->db->immediate(function() use ($actor,$data,$existingSlug): string {
             $this->authorize($actor);
@@ -66,12 +84,53 @@ final class Catalog
         return $value;
     }
 
+    private static function durationOptions(array $values): array
+    {
+        $selected=$values['duration_options']??[];
+        if (!is_array($selected) || count($selected)>count(self::DURATION_OPTIONS)) { throw new \DomainException('Bitte die Dauerauswahl prüfen.'); }
+        $options=[];
+        foreach (self::DURATION_OPTIONS as $option) { if (in_array($option,$selected,true)) { $options[]=$option; } }
+        if ($options===[]) { throw new \DomainException('Bitte mindestens eine Dauer auswählen.'); }
+        return $options;
+    }
+
+    /** Akzeptiert ausschließlich Pfade, die der Upload-Ablage entsprechen. */
+    public static function mediaPath(mixed $value): string
+    {
+        if ($value===null || $value==='') { return ''; }
+        if (!is_string($value) || !preg_match('~^uploads/[a-z0-9-]+/[a-f0-9]{24}\.(?:jpg|png|webp|pdf)$~D',$value)) { throw new \DomainException('Die hochgeladene Datei ist ungültig.'); }
+        return $value;
+    }
+
     private static function lines(array $values, string $key): array
     {
         $lines=array_values(array_filter(array_map('trim',explode("\n",self::text($values,$key,2000)))));
         if (count($lines)<1 || count($lines)>12) { throw new \DomainException('Bitte zwischen 1 und 12 Stichpunkte eintragen.'); }
         foreach ($lines as $line) { if (mb_strlen($line)>250) { throw new \DomainException('Ein Stichpunkt ist zu lang.'); } }
         return $lines;
+    }
+
+    /** Optionale Stichpunktliste aus einem mehrzeiligen Textfeld. */
+    private static function bullets(array $values, string $key, int $max): array
+    {
+        $value=$values[$key]??'';
+        if (!is_string($value) || mb_strlen($value)>2000) { throw new \DomainException('Bitte das Feld „'.$key.'“ prüfen.'); }
+        $lines=array_values(array_filter(array_map('trim',explode("\n",$value))));
+        if (count($lines)>$max) { throw new \DomainException('Bitte höchstens '.$max.' Stichpunkte eintragen.'); }
+        foreach ($lines as $line) { if (mb_strlen($line)>250) { throw new \DomainException('Ein Stichpunkt ist zu lang.'); } }
+        return $lines;
+    }
+
+    /** Erlaubt ausschließlich vollständige LinkedIn-Profiladressen über HTTPS. */
+    public static function linkedin(mixed $value): string
+    {
+        $value=is_string($value)?trim($value):'';
+        if ($value==='') { return ''; }
+        $host=is_string(parse_url($value,PHP_URL_HOST))?strtolower((string)parse_url($value,PHP_URL_HOST)):'';
+        if (mb_strlen($value)>300 || filter_var($value,FILTER_VALIDATE_URL)===false || parse_url($value,PHP_URL_SCHEME)!=='https' || ($host!=='linkedin.com' && !str_ends_with($host,'.linkedin.com'))) {
+            throw new \DomainException('Bitte eine LinkedIn-Adresse wie https://www.linkedin.com/in/name angeben.');
+        }
+        return $value;
     }
 
     private static function slug(string $slug): void

@@ -14,8 +14,9 @@ final class MailOutbox
     {
         if (!$this->config->mailEnabled) { throw new \DomainException('Der E-Mail-Versand ist noch nicht eingerichtet.'); }
         if (!$this->db->inTransaction()) { throw new \LogicException('Mailauftrag benötigt eine fachliche Transaktion.'); }
-        $path = $kind === 'password_reset' ? '/passwort-neu' : '/email-bestaetigen';
-        $link = $this->config->url . $path . '#token=' . $token['token'];
+        // Einladungen nutzen den Passwortpfad, weil die eingeladene Person dort ihr Passwort selbst festlegt.
+        $paths = ['password_reset'=>'/passwort-neu','account_invitation'=>'/passwort-neu'];
+        $link = $this->config->url . ($paths[$kind] ?? '/email-bestaetigen') . '#token=' . $token['token'];
         $blocked = $this->config->environment !== 'production' && !str_ends_with(mb_strtolower($user['email']), '@example.test');
         $this->db->run('INSERT INTO notification_outbox(event_key,kind,user_id,token_id,recipient,secret_payload_ciphertext,key_id,status,available_at,message_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)', [
             $kind.':'.$token['id'],$kind,$user['id'],$token['id'],$user['email'],
@@ -54,12 +55,15 @@ final class MailOutbox
             }
             try {
                 $payload = json_decode($this->crypto->decrypt($row['secret_payload_ciphertext'],'mail',$row['key_id']),true,512,JSON_THROW_ON_ERROR);
-                $title = $row['kind'] === 'password_reset' ? 'Passwort zurücksetzen' : 'E-Mail-Adresse bestätigen';
-                $intro = $row['kind'] === 'password_reset' ? 'Du hast ein neues Passwort angefordert.' : 'Bitte bestätige deine E-Mail-Adresse für dein Corpsakademie-Konto.';
+                $title = match($row['kind']) {'password_reset'=>'Passwort zurücksetzen','account_invitation'=>'Zugang einrichten',default=>'E-Mail-Adresse bestätigen'};
+                $intro = match($row['kind']) {'password_reset'=>'Du hast ein neues Passwort angefordert.','account_invitation'=>'Für dich wurde ein Corpsakademie-Konto angelegt. Lege jetzt dein Passwort fest.',default=>'Bitte bestätige deine E-Mail-Adresse für dein Corpsakademie-Konto.'};
+                // Einladungslink sind länger gültig als Wiederherstellungslinks.
+                $validity = $row['kind'] === 'account_invitation' ? '14 Tage' : '30 Minuten';
+                $action = $row['kind'] === 'account_invitation' ? 'Passwort festlegen' : $title;
                 $link = htmlspecialchars($payload['link'],ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
                 $message = (new Email())->from($this->config->mailFrom)->replyTo($this->config->mailReplyTo)->to($row['recipient'])->subject('Corpsakademie · '.$title)
-                    ->text($intro."\n\n".$payload['link']."\n\nDieser Link ist einmalig und 30 Minuten gültig. Wenn du die Nachricht nicht angefordert hast, kannst du sie ignorieren.")
-                    ->html('<html lang="de"><body><h1>'.htmlspecialchars($title).'</h1><p>'.htmlspecialchars($intro).'</p><p><a href="'.$link.'">'.htmlspecialchars($title).'</a></p><p>Einmalig nutzbar und 30 Minuten gültig. Falls du diese Nachricht nicht angefordert hast, kannst du sie ignorieren.</p></body></html>');
+                    ->text($intro."\n\n".$payload['link']."\n\nDieser Link ist einmalig und ".$validity." gültig. Wenn du die Nachricht nicht angefordert hast, kannst du sie ignorieren.")
+                    ->html('<html lang="de"><body><h1>'.htmlspecialchars($title).'</h1><p>'.htmlspecialchars($intro).'</p><p><a href="'.$link.'">'.htmlspecialchars($action).'</a></p><p>Einmalig nutzbar und '.$validity.' gültig. Falls du diese Nachricht nicht angefordert hast, kannst du sie ignorieren.</p></body></html>');
                 $message->getHeaders()->addIdHeader('Message-ID',$row['message_id']);
                 if ($this->db->one("SELECT id FROM notification_outbox WHERE id=? AND status='sending' AND lease_token=? AND lease_until>?",[$row['id'],$row['lease_token'],$this->clock->now()->getTimestamp()])===null) {
                     $results[$this->finish($row,'ambiguous','Lease vor SMTP-Übergabe verloren')]++; continue;

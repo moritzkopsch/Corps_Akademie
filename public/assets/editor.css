@@ -125,3 +125,112 @@
     font-size:16px
   }
 }
+.editor-choices {
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 22px
+}
+details.editor-note>summary {
+  cursor:pointer;
+  font-weight:600;
+  color:var(--ink)
+}
+details.editor-note>summary::marker {
+  color:var(--gold)
+}
+.editor-featured-list {
+  margin:12px 0 8px;
+  padding-left:20px
+}
+.editor-featured-list li {
+  margin-bottom:4px
+}
+.editor-featured-list span {
+  color:var(--muted)
+}
+.editor-image-preview {
+  border:1px solid var(--line);
+  border-radius:8px;
+  max-width:240px;
+  height:auto
+}
+.editor-table-image {
+  border-radius:6px;
+  height:auto
+}
+.editor-badge {
+  display:inline-block;
+  background:var(--cream);
+  border:1px solid var(--gold);
+  border-radius:999px;
+  color:#8b682e;
+  font-size:.62rem;
+  font-weight:600;
+  letter-spacing:.06em;
+  padding:1px 9px;
+  text-transform:uppercase;
+  vertical-align:middle
+}
+.editor-form input[type=file] {
+  background:#fff;
+  border:1px dashed var(--line);
+  border-radius:8px;
+  cursor:pointer;
+  font-size:.84rem;
+  padding:12px 14px;
+  width:100%
+}
+.calendar-months {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  list-style:none;
+  margin:18px 0 0;
+  padding:0
+}
+.calendar-months li {
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  font-size:.82rem;
+  min-width:150px;
+  padding:10px 14px
+}
+.calendar-months li span {
+  color:var(--muted);
+  font-size:.7rem;
+  letter-spacing:.06em;
+  text-transform:uppercase
+}
+.calendar-months .calendar-open {
+  background:var(--cream);
+  border-color:var(--gold)
+}
+.calendar-months .calendar-open span {
+  color:#8b682e
+}
+.calendar-list {
+  list-style:none;
+  margin:15px 0 25px;
+  padding:0
+}
+.calendar-list li {
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 18px;
+  border-bottom:1px solid var(--line);
+  font-size:.86rem;
+  padding:11px 0
+}
+.calendar-list li span {
+  color:var(--muted)
+}
+.inline-form {
+  display:flex;
+  align-items:center;
+  gap:16px;
+  margin:0
+}
+

@@ -21,8 +21,10 @@ final class Application
         '/passwort-vergessen'=>['GET','POST'], '/passwort-neu'=>['GET','POST'],
         '/sicherheit/einrichten'=>['GET','POST'], '/sicherheit/code'=>['GET','POST'],
         '/sicherheit/wiederherstellung'=>['GET'], '/konto'=>['GET'], '/admin'=>['GET'],
-        '/admin/benutzer'=>['GET'], '/portal'=>['GET'],
+        '/admin/benutzer'=>['GET','POST'], '/portal'=>['GET'], '/portal/kalender'=>['GET','POST'], '/admin/kalender'=>['GET','POST'],
     ];
+
+    private const ASSIGNABLE_ROLES = ['instructor'=>'Referent','admin'=>'Administrator','superadmin'=>'Superadministrator'];
 
     public function __construct(private readonly Container $c)
     {
@@ -48,7 +50,9 @@ final class Application
                 $response->headers->set('Allow',implode(', ',$methods));
                 return $this->headers($response);
             }
-            if ((int)$request->headers->get('Content-Length','0')>32768) { return $this->headers($this->error(413,'Eingabe zu groß','Bitte kürze deine Eingaben.')); }
+            // Verwaltungsformulare übertragen Bilder oder PDFs, alle übrigen Aufrufe bleiben knapp begrenzt.
+            $inputLimit = str_starts_with($path,'/admin/') ? 8388608 : 32768;
+            if ((int)$request->headers->get('Content-Length','0')>$inputLimit) { return $this->headers($this->error(413,'Eingabe zu groß','Bitte kürze deine Eingaben.')); }
             $ip = $request->getClientIp() ?? 'unknown';
             if (!$this->c->limits->attempt('http.ip',$ip,120,60)) { return $this->headers($this->error(429,'Bitte kurz warten','Zu viele Aufrufe. Bitte in einer Minute erneut versuchen.')); }
             $session = $this->c->sessions->load($request);
@@ -185,6 +189,8 @@ final class Application
                 return $this->form('mfa',$session,$values);
             }
             if (!$this->isAuthenticated($session)) { return new RedirectResponse($this->destination($session),303); }
+            if (str_starts_with($path,'/portal/kalender')) { return (new ReferentCalendar($this->c,$this->view(...)))->handle($request,$session,$user); }
+            if (str_starts_with($path,'/admin/kalender')) { return (new CalendarAdmin($this->c,$this->view(...)))->handle($request,$session,$user); }
             if (str_starts_with($path,'/admin/newsletter')) { return (new NewsletterAdmin($this->c,$this->view(...)))->handle($request,$session,$user); }
             $content = $website->admin($request,$session,$user);
             if ($content !== null) { return $content; }
@@ -197,9 +203,19 @@ final class Application
             if ($path === '/admin' || $path === '/admin/benutzer') {
                 $permission = $path === '/admin' ? 'admin.access' : 'users.view';
                 if (!$this->c->accounts->can((int)$user['id'],$permission)) { return $this->error(403,'Kein Zugriff','Für diesen Bereich fehlt dir die Berechtigung.',$session); }
+                $manage = $this->c->accounts->can((int)$user['id'],'users.manage');
+                $notice = null; $error = null;
+                if ($post && $path === '/admin/benutzer') {
+                    if (!$manage) { return $this->error(403,'Kein Zugriff','Für diesen Bereich fehlt dir die Berechtigung.',$session); }
+                    try { $notice = $this->manageUser($request,(int)$user['id']); }
+                    catch (\DomainException $exception) { $error = $exception->getMessage(); }
+                }
                 $users = $this->c->identity->overview();
                 $stats = $this->c->identity->statistics();
-                return $this->view('admin.twig',$session,['users'=>$users,'stats'=>$stats,'list_only'=>$path==='/admin/benutzer']);
+                return $this->view('admin.twig',$session,[
+                    'users'=>$users,'stats'=>$stats,'list_only'=>$path==='/admin/benutzer',
+                    'can_manage'=>$manage,'notice'=>$notice,'error'=>$error,'assignable_roles'=>self::ASSIGNABLE_ROLES,
+                ],$error===null?200:422);
             }
             if ($path === '/portal') {
                 if (!$this->c->accounts->can((int)$user['id'],'portal.access')) { return $this->error(403,'Kein Zugriff','Für diesen Bereich fehlt dir die Berechtigung.',$session); }
@@ -215,6 +231,26 @@ final class Application
             if ($path==='/sicherheit/einrichten') { return $this->enrollment($session,$user,$error->getMessage()); }
             return $kind === null ? $this->error(422,'Bitte Eingabe prüfen',$error->getMessage(),$session) : $this->form($kind,$session,$values,$error->getMessage(),422);
         }
+    }
+
+    /** Führt eine Benutzerverwaltungsaktion aus und liefert die Erfolgsmeldung für die Übersicht. */
+    private function manageUser(Request $request, int $actorId): string
+    {
+        $action = $this->input($request,'action');
+        if ($action === 'invite') {
+            $email = trim($this->input($request,'email'));
+            $this->c->links->invite($actorId,$email,$this->input($request,'name'),$this->input($request,'role'));
+            return 'Einladung an '.$email.' wurde versendet.';
+        }
+        $target = (int)$this->input($request,'user_id');
+        if ($target <= 0) { throw new \DomainException('Bitte ein Konto auswählen.'); }
+        if ($action === 'disable') {
+            if ($target === $actorId) { throw new \DomainException('Das eigene Konto kann nicht deaktiviert werden.'); }
+            $this->c->accounts->disable($target);
+            return 'Das Konto wurde deaktiviert.';
+        }
+        if ($action === 'enable') { $this->c->accounts->enable($target); return 'Das Konto ist wieder aktiv.'; }
+        throw new \DomainException('Unbekannte Aktion.');
     }
 
     private function mfaLimit(array $user, string $ip): void

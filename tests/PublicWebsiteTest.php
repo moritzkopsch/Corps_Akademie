@@ -175,7 +175,7 @@ final class PublicWebsiteTest extends Fixture
     {
         $this->administrator();
         foreach (['/admin/seminare','/admin/referenten','/admin/anfragen','/admin/seminare/neu','/admin/referenten/neu','/admin/seminare/bewerbungstraining','/admin/referenten/jan-wattjes'] as $path) { self::assertSame(200,$this->request('GET',$path)->getStatusCode(),$path); }
-        $values=['_csrf'=>$this->csrf(),'slug'=>'neues-seminar','title'=>'<script>Test</script>','category_id'=>'1','summary'=>'Testinhalt','description'=>'Ein fachlicher Testinhalt.','benefits'=>"Lernziel eins\nLernziel zwei",'audience'=>'Testgruppe','duration'=>'Nach Abstimmung','format'=>'Präsenz','status'=>'draft','row_version'=>'0'];
+        $values=['_csrf'=>$this->csrf(),'slug'=>'neues-seminar','title'=>'<script>Test</script>','category_id'=>'1','summary'=>'Testinhalt','description'=>'Ein fachlicher Testinhalt.','benefits'=>"Lernziel eins\nLernziel zwei",'audience'=>'Testgruppe','duration_options'=>['2 Tage'],'format'=>'Präsenz','status'=>'draft','row_version'=>'0'];
         self::assertSame(303,$this->request('POST','/admin/seminare/neu',$values)->getStatusCode());
         self::assertSame(404,$this->request('GET','/seminare/neues-seminar')->getStatusCode());
         $values['status']='published'; $values['row_version']='1';

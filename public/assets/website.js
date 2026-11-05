@@ -28,6 +28,19 @@ if (mode && options) {
   options.addEventListener('change', synchronize);
   synchronize();
 }
+const cookieNotice = document.querySelector('#cookie-notice');
+if (cookieNotice) {
+  // Only necessary cookies exist, so this is a notice, not a consent gate.
+  let dismissed = false;
+  try { dismissed = window.localStorage.getItem('corpsakademie.cookie-notice') === 'dismissed'; } catch (error) { dismissed = false; }
+  if (!dismissed) {
+    cookieNotice.hidden = false;
+    cookieNotice.querySelector('[data-cookie-dismiss]').addEventListener('click', () => {
+      try { window.localStorage.setItem('corpsakademie.cookie-notice', 'dismissed'); } catch (error) { /* Speicher nicht verfügbar */ }
+      cookieNotice.hidden = true;
+    });
+  }
+}
 document.querySelectorAll('[data-wizard]').forEach((form) => {
   const steps = [...form.querySelectorAll('[data-step]')];
   const labels = [...form.querySelectorAll('[data-step-label]')];

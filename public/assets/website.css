@@ -2082,3 +2082,130 @@ svg {
   font-size: .75rem;
   line-height: 1.6;
 }
+.cookie-notice {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  background: var(--navy);
+  border-top: 2px solid var(--gold);
+  color: var(--white);
+}
+.cookie-notice-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 14px 0;
+}
+.cookie-notice p {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: .8125rem;
+  line-height: 1.6;
+}
+.cookie-notice a {
+  color: var(--gold-light);
+}
+@media (max-width: 640px) {
+  .cookie-notice-inner {
+    padding: 12px 0;
+  }
+}
+.card-media {
+  margin: -28px -28px 22px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+.card-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.detail-media {
+  margin: 26px 0 30px;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.detail-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+}
+@media (max-width: 900px) {
+  .detail-heading {
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+}
+.profile-portrait.has-photo {
+  background: #e9e6de;
+}
+.profile-portrait.has-photo:before,
+.profile-portrait.has-photo i {
+  display: none;
+}
+.profile-portrait.has-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 22%;
+}
+.person-photo {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 1px solid #d4c4a4;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.person-heading>div>p.person-headline {
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.person-heading>div>p.person-link {
+  margin-bottom: 0;
+}
+.person-heading>div>p.person-link .detail-link {
+  font-size: .72rem;
+}
+.career-list {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 26px;
+  padding: 0;
+  list-style: none;
+}
+.career-list li {
+  position: relative;
+  padding-left: 24px;
+  font-size: .875rem;
+  line-height: 1.6;
+}
+.career-list li:before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: .55em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.corps-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+}
+.corps-list li {
+  font-size: .8rem;
+  color: var(--muted);
+}

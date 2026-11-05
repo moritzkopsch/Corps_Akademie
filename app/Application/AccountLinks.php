@@ -3,11 +3,14 @@ declare(strict_types=1);
 namespace Corpsakademie\Application;
 
 use Corpsakademie\Domain\Identity\{Accounts,RateLimiter,Tokens};
-use Corpsakademie\Infrastructure\{Audit,Config,Database,IdentityRepository,MailOutbox};
+use Corpsakademie\Infrastructure\{Audit,Config,Crypto,Database,IdentityRepository,MailOutbox};
 use Psr\Clock\ClockInterface;
 
 final class AccountLinks
 {
+    /** Einladungen bleiben deutlich länger gültig als Wiederherstellungslinks. */
+    private const INVITATION_SECONDS = 14 * 86400;
+
     public function __construct(private readonly Database $db, private readonly Accounts $accounts, private readonly Tokens $tokens, private readonly MailOutbox $mail, private readonly RateLimiter $limits, private readonly Audit $audit, private readonly Config $config, private readonly ClockInterface $clock, private readonly IdentityRepository $store) {}
 
     public function isUnconfigured(): bool
@@ -32,6 +35,20 @@ final class AccountLinks
             $user = $this->accounts->create($email,$name,$password,'superadmin');
             $this->queueVerification($user);
             $this->audit->record('setup.completed',(int)$user['id'],$user['public_id']);
+            return $user;
+        });
+    }
+
+    /** Legt ein Konto an und verschickt einen Einrichtungslink; das Passwort setzt die eingeladene Person selbst. */
+    public function invite(int $actorId, string $email, string $name, string $role): array
+    {
+        return $this->db->immediate(function () use ($actorId,$email,$name,$role): array {
+            // Das Zufallspasswort ist nur ein Platzhalter; gültig wird das Konto über den Einrichtungslink.
+            $user = $this->accounts->create($email,$name,Crypto::token(),$role);
+            // Einladungen nutzen den Wiederherstellungspfad, der beim Setzen zugleich die E-Mail-Adresse bestätigt.
+            $token = $this->tokens->issue('password_reset',(int)$user['id'],self::INVITATION_SECONDS);
+            $this->mail->enqueue('account_invitation',$user,$token);
+            $this->audit->record('account.invited',$actorId,$user['public_id'],['role'=>$role]);
             return $user;
         });
     }
