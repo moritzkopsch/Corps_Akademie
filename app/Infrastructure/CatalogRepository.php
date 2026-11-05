@@ -35,13 +35,13 @@ final class CatalogRepository
         $sql='SELECT r.* FROM referent_profiles r WHERE 1=1'; $args=[];
         if ($public) { $sql.=" AND r.status='published'"; }
         if ($seminarId!==null) { $sql.=' AND EXISTS(SELECT 1 FROM seminar_referents sr WHERE sr.referent_id=r.id AND sr.seminar_id=?)'; $args[]=$seminarId; }
-        return array_map($this->referentProjection(...),$this->db->run($sql.' ORDER BY r.name LIMIT 200',$args)->fetchAll());
+        return array_map(fn(array $row): array=>$this->referentProjection($row,$public),$this->db->run($sql.' ORDER BY r.name LIMIT 200',$args)->fetchAll());
     }
 
     public function referent(string $slug, bool $public = true): ?array
     {
         $row=$this->db->one('SELECT * FROM referent_profiles WHERE slug=?'.($public?" AND status='published'":''),[$slug]);
-        return $row===null?null:$this->referentProjection($row);
+        return $row===null?null:$this->referentProjection($row,$public);
     }
 
     public function featuredCount(?int $exceptId = null): int
@@ -67,11 +67,11 @@ final class CatalogRepository
 
     public function saveReferent(array $data, ?array $existing, int $now): int
     {
-        $params=[$data['slug'],$data['name'],$data['headline'],$data['corps'],$data['biography'],json_encode($data['expertise'],JSON_THROW_ON_ERROR),$data['status'],$data['image_path'],$data['linkedin_url'],$data['cv_path'],json_encode($data['corps_memberships'],JSON_THROW_ON_ERROR),json_encode($data['career'],JSON_THROW_ON_ERROR),$now];
+        $params=[$data['slug'],$data['name'],$data['headline'],$data['corps'],$data['biography'],json_encode($data['expertise'],JSON_THROW_ON_ERROR),$data['status'],$data['image_path'],$data['linkedin_url'],$data['cv_path'],json_encode($data['corps_memberships'],JSON_THROW_ON_ERROR),json_encode($data['career'],JSON_THROW_ON_ERROR),$data['user_id']??null,$now];
         if ($existing===null) {
-            return (int)$this->db->run('INSERT INTO referent_profiles(slug,name,headline,corps,biography,expertise_json,status,image_path,linkedin_url,cv_path,corps_memberships,career_json,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
+            return (int)$this->db->run('INSERT INTO referent_profiles(slug,name,headline,corps,biography,expertise_json,status,image_path,linkedin_url,cv_path,corps_memberships,career_json,user_id,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id',[...$params,$now])->fetchColumn();
         }
-        $changed=$this->db->run('UPDATE referent_profiles SET slug=?,name=?,headline=?,corps=?,biography=?,expertise_json=?,status=?,image_path=?,linkedin_url=?,cv_path=?,corps_memberships=?,career_json=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
+        $changed=$this->db->run('UPDATE referent_profiles SET slug=?,name=?,headline=?,corps=?,biography=?,expertise_json=?,status=?,image_path=?,linkedin_url=?,cv_path=?,corps_memberships=?,career_json=?,user_id=?,updated_at=?,row_version=row_version+1 WHERE id=? AND row_version=?',[...$params,$existing['id'],$data['row_version']])->rowCount();
         if ($changed!==1) { throw new \DomainException('Das Profil wurde zwischenzeitlich geändert. Bitte die Seite neu öffnen.'); }
         return (int)$existing['id'];
     }
@@ -88,10 +88,10 @@ final class CatalogRepository
         return $row;
     }
 
-    private function referentProjection(array $row): array
+    private function referentProjection(array $row, bool $public): array
     {
         // Only editorial profile fields are public, never the linked account or its contact data.
-        unset($row['user_id']);
+        if ($public) { unset($row['user_id']); } else { $row['user_id']=$row['user_id']===null?null:(int)$row['user_id']; }
         $row['id']=(int)$row['id']; $row['row_version']=(int)$row['row_version'];
         $row['expertise']=json_decode($row['expertise_json'],true,512,JSON_THROW_ON_ERROR);
         $row['career']=json_decode($row['career_json'],true,512,JSON_THROW_ON_ERROR);
