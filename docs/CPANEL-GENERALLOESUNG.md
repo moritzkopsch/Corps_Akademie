@@ -223,6 +223,7 @@ Nur über den Wrapper, damit die gemeinsame Sperre greift:
 ```text
 */5 * * * * /usr/local/bin/php $BASE/current/scripts/cpanel-console.php --base=$BASE mail:work --limit=3 --if-enabled
 1-59/5 * * * * /usr/local/bin/php $BASE/current/scripts/cpanel-console.php --base=$BASE newsletter:work --limit=1 --if-enabled
+13 6 * * * /usr/local/bin/php $BASE/current/scripts/cpanel-console.php --base=$BASE calendar:remind --limit=20 --if-enabled
 ```
 
 Den absoluten PHP-Pfad verwenden, dessen Erweiterungen geprüft sind. `--if-enabled` beendet bei

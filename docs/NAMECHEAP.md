@@ -132,6 +132,7 @@ Alle fünf Minuten für Bestätigungsmails, zeitlich versetzt für Rundmails:
 ```text
 */5 * * * * /usr/local/bin/php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --base=/home/pushgobt/corps-akademie.r4av.com mail:work --limit=3 --if-enabled
 1-59/5 * * * * /usr/local/bin/php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --base=/home/pushgobt/corps-akademie.r4av.com newsletter:work --limit=1 --if-enabled
+13 6 * * * /usr/local/bin/php /home/pushgobt/corps-akademie.r4av.com/current/scripts/cpanel-console.php --base=/home/pushgobt/corps-akademie.r4av.com calendar:remind --limit=20 --if-enabled
 ```
 
 `--if-enabled` beendet den Lauf bei abgeschaltetem Mailversand ohne Fehler. Der Newsletter-Worker begrenzt in Produktion zusätzlich datenbankgestützt auf höchstens einen Versandversuch je fünf Minuten, auch bei parallel gestarteten Workern. Zusammen mit diesen Cronjobs sind zunächst bis zu 36 Bestätigungsmails und 12 Rundmails pro Stunde vorgesehen; manuelle zusätzliche Bestätigungsworker und sonstiger Postfachversand können das Domainkontingent zusätzlich belasten.

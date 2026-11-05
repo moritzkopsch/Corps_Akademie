@@ -21,7 +21,7 @@ final class Application
         '/passwort-vergessen'=>['GET','POST'], '/passwort-neu'=>['GET','POST'],
         '/sicherheit/einrichten'=>['GET','POST'], '/sicherheit/code'=>['GET','POST'],
         '/sicherheit/wiederherstellung'=>['GET'], '/konto'=>['GET'], '/admin'=>['GET'],
-        '/admin/benutzer'=>['GET','POST'], '/portal'=>['GET'],
+        '/admin/benutzer'=>['GET','POST'], '/portal'=>['GET'], '/portal/kalender'=>['GET','POST'], '/admin/kalender'=>['GET','POST'],
     ];
 
     private const ASSIGNABLE_ROLES = ['instructor'=>'Referent','admin'=>'Administrator','superadmin'=>'Superadministrator'];
@@ -189,6 +189,8 @@ final class Application
                 return $this->form('mfa',$session,$values);
             }
             if (!$this->isAuthenticated($session)) { return new RedirectResponse($this->destination($session),303); }
+            if (str_starts_with($path,'/portal/kalender')) { return (new ReferentCalendar($this->c,$this->view(...)))->handle($request,$session,$user); }
+            if (str_starts_with($path,'/admin/kalender')) { return (new CalendarAdmin($this->c,$this->view(...)))->handle($request,$session,$user); }
             if (str_starts_with($path,'/admin/newsletter')) { return (new NewsletterAdmin($this->c,$this->view(...)))->handle($request,$session,$user); }
             $content = $website->admin($request,$session,$user);
             if ($content !== null) { return $content; }

@@ -1,0 +1,31 @@
+{% extends 'base.twig' %}
+{% block title %}Mein Kalender{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/assets/editor.css">{% endblock %}
+{% block content %}<section class="page editor-page">
+<div class="page-heading"><div><p class="eyebrow dark">CORPSAKADEMIE · REFERENTENKALENDER</p><h1>Verfügbarkeit <em>und Termine.</em></h1><p>Pflege, wann du verfügbar bist und welche Termine anstehen. Vorgeschlagene Termine bestätigt die Verwaltung.</p></div><a class="subtle-link" href="/portal">Zurück zum Portal</a></div>
+<nav class="editor-navigation" aria-label="Portal"><a href="/portal">Übersicht</a><a href="/portal/kalender" aria-current="page">Kalender</a><a href="/konto">Mein Konto</a></nav>
+{% if notice %}<div class="notice" role="status">{{ notice }}</div>{% endif %}
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+{% if profile is null %}
+<div class="card"><h2>Noch kein Referentenprofil</h2><p>Dein Konto ist noch keinem Referentenprofil zugeordnet. Sobald die Verwaltung dein Profil verknüpft hat, kannst du hier deine Verfügbarkeit und deine Termine pflegen.</p></div>
+{% else %}
+<div class="card"><h2>Planung der nächsten {{ planning_months }} Monate</h2><p>Ein Monat gilt als geplant, sobald ein Verfügbarkeitszeitraum oder ein Termin darin liegt. Offene Monate lösen eine Erinnerung per E-Mail aus.</p>
+<ul class="calendar-months">{% for month in coverage %}<li class="{{ month.planned ? 'calendar-planned' : 'calendar-open' }}"><strong>{{ month.label }}</strong><span>{{ month.planned ? 'geplant' : 'offen' }}</span></li>{% endfor %}</ul></div>
+<div class="card"><h2>Verfügbarkeit pflegen</h2><p>Freie Zeiträume und Sperrzeiten gelten für ganze Tage.</p>
+<form method="post" class="editor-form"><input type="hidden" name="_csrf" value="{{ csrf }}"><input type="hidden" name="action" value="window">
+<label for="starts_on">Von</label><input id="starts_on" name="starts_on" type="date" min="2000-01-01" max="2100-12-31" value="{{ values.starts_on|default(today) }}" required>
+<label for="ends_on">Bis</label><input id="ends_on" name="ends_on" type="date" min="2000-01-01" max="2100-12-31" value="{{ values.ends_on|default(today) }}" required>
+<label for="kind">Art</label><select id="kind" name="kind">{% for code,label in kinds %}<option value="{{ code }}" {% if values.kind|default('available')==code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+<label for="window_note">Notiz (optional)</label><input id="window_note" name="note" maxlength="300" value="{{ values.note|default('') }}">
+<div class="button-row"><button class="button" type="submit">Zeitraum speichern</button></div></form>
+{% if windows %}<div class="table-wrap"><table><thead><tr><th>Von</th><th>Bis</th><th>Art</th><th>Notiz</th><th>Aktion</th></tr></thead><tbody>{% for slot in windows %}<tr><td>{{ slot.starts_on|date('d.m.Y','Europe/Berlin') }}</td><td>{{ slot.ends_on|date('d.m.Y','Europe/Berlin') }}</td><td>{{ kinds[slot.kind] ?? slot.kind }}</td><td>{{ slot.note ?: '–' }}</td><td><form method="post"><input type="hidden" name="_csrf" value="{{ csrf }}"><input type="hidden" name="action" value="window-remove"><input type="hidden" name="window_id" value="{{ slot.id }}"><button class="text-button" type="submit">Entfernen</button></form></td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="field-hint">Noch keine Zeiträume hinterlegt.</p>{% endif %}</div>
+<div class="card"><h2>Termin vorschlagen</h2><p>Ein Vorschlag ist unverbindlich. Erst mit der Zustimmung der Verwaltung gilt der Termin als bestätigt.</p>
+<form method="post" class="editor-form"><input type="hidden" name="_csrf" value="{{ csrf }}"><input type="hidden" name="action" value="appointment">
+<label for="title">Bezeichnung</label><input id="title" name="title" maxlength="140" value="{{ values.title|default('') }}" required>
+<label for="day">Datum</label><input id="day" name="day" type="date" min="2000-01-01" max="2100-12-31" value="{{ values.day|default(today) }}" required>
+<label for="location">Ort (optional)</label><input id="location" name="location" maxlength="120" value="{{ values.location|default('') }}">
+<label for="seminar_id">Seminar (optional)</label><select id="seminar_id" name="seminar_id"><option value="">Kein Bezug</option>{% for seminar in seminars %}<option value="{{ seminar.id }}" {% if values.seminar_id|default('')==seminar.id %}selected{% endif %}>{{ seminar.title }}</option>{% endfor %}</select>
+<label for="appointment_note">Notiz (optional)</label><input id="appointment_note" name="note" maxlength="300" value="{{ values.note|default('') }}">
+<div class="button-row"><button class="button" type="submit">Vorschlag speichern</button></div></form></div>
+<div class="card"><h2>Termine</h2><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Termin</th><th>Ort</th><th>Zustand</th><th>Aktion</th></tr></thead><tbody>{% for appointment in appointments %}<tr><td>{{ appointment.day|date('d.m.Y','Europe/Berlin') }}</td><th scope="row">{{ appointment.title }}{% if appointment.seminar %}<br><span class="field-hint">{{ appointment.seminar }}</span>{% endif %}</th><td>{{ appointment.location ?: '–' }}</td><td>{{ states[appointment.state] ?? appointment.state }}</td><td>{% if appointment.source=='referent' and appointment.state in ['proposed','declined'] %}<form method="post"><input type="hidden" name="_csrf" value="{{ csrf }}"><input type="hidden" name="action" value="appointment-withdraw"><input type="hidden" name="appointment_id" value="{{ appointment.id }}"><button class="text-button" type="submit">Zurückziehen</button></form>{% else %}–{% endif %}</td></tr>{% else %}<tr><td colspan="5">Noch keine Termine hinterlegt.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endif %}</section>{% endblock %}
