@@ -123,7 +123,7 @@ final class PublicWebsite
         $values=$existing??[];
         if ($request->isMethod('POST')) { $values=$this->values($request)+$values; }
         $currentId=$existing['id']??null;
-        return $show(['section'=>$section,'editing'=>$slug!==null,'values'=>$values,'error'=>$error,'categories'=>$this->c->catalog->categories(),'seminars'=>$this->c->catalog->seminars(false),'referents'=>$this->c->catalog->referents(false),'assigned'=>$existing===null?[]:array_column($this->c->catalog->referents(false,(int)$existing['id']),'id'),'variants'=>Catalog::DURATION_OPTIONS,'featured_limit'=>Catalog::FEATURED_LIMIT,'featured_seminars'=>array_values(array_filter($this->c->catalog->seminars(false),static fn(array $seminar): bool=>$seminar['featured']===1 && $seminar['id']!==$currentId))],$error===null?200:422);
+        return $show(['section'=>$section,'editing'=>$slug!==null,'values'=>$values,'error'=>$error,'categories'=>$this->c->catalog->categories(),'seminars'=>$this->c->catalog->seminars(false),'referents'=>$this->c->catalog->referents(false),'accounts'=>$section==='referenten'?$this->c->identity->overview():[],'assigned'=>$existing===null?[]:array_column($this->c->catalog->referents(false,(int)$existing['id']),'id'),'variants'=>Catalog::DURATION_OPTIONS,'featured_limit'=>Catalog::FEATURED_LIMIT,'featured_seminars'=>array_values(array_filter($this->c->catalog->seminars(false),static fn(array $seminar): bool=>$seminar['featured']===1 && $seminar['id']!==$currentId))],$error===null?200:422);
     }
 
     /** Legt eine hochgeladene Datei ab, ohne die bisherige zu löschen; erst ein erfolgreiches Speichern ersetzt sie. */
@@ -145,7 +145,7 @@ final class PublicWebsite
 
     private function values(Request $request): array
     {
-        $values=array_fill_keys(['email','name','corps','role','phone','message','seminar','participants','date','location','format','token','state','slug','title','category_id','summary','description','audience','duration','status','featured','row_version','headline','biography','benefits','expertise','image_path','cv_path','linkedin_url','corps_memberships','career'],'');
+        $values=array_fill_keys(['email','name','corps','role','phone','message','seminar','participants','date','location','format','token','state','slug','title','category_id','summary','description','audience','duration','status','featured','row_version','headline','biography','benefits','expertise','image_path','cv_path','linkedin_url','corps_memberships','career','user_id'],'');
         $values['referent_mode']='recommend'; $values['submission']=Crypto::token(); $values['referents']=[]; $values['duration_options']=[];
         foreach ($request->request->all() as $key=>$value) {
             if (in_array($key,['referents','duration_options'],true) && is_array($value)) { $values[$key]=array_values(array_filter($value,'is_string')); }

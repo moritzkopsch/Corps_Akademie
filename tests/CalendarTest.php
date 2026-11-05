@@ -147,6 +147,34 @@ final class CalendarTest extends Fixture
         self::assertSame(1,$this->windowCount());
     }
 
+    public function testReferentProfileIsLinkedToAccountAndStaysPrivate(): void
+    {
+        $admin=$this->admin();
+        $account=$this->account('neuling@example.test','instructor','Neuling');
+        $slug=$this->c->content->saveReferent($admin,[
+            'slug'=>'neuling-profil','name'=>'Neuling','headline'=>'Schwerpunkt','biography'=>'Profiltext','expertise'=>"Fachgebiet A\nFachgebiet B",
+            'status'=>'published','user_id'=>(string)$account['id'],
+        ]);
+        self::assertSame('neuling-profil',$slug);
+        self::assertSame((int)$account['id'],$this->c->catalog->referent($slug,false)['user_id']);
+        self::assertArrayNotHasKey('user_id',$this->c->catalog->referent($slug,true));
+
+        $this->expectException(\DomainException::class);
+        $this->c->content->saveReferent($admin,[
+            'slug'=>'zweites-profil','name'=>'Zweites','headline'=>'Schwerpunkt','biography'=>'Profiltext','expertise'=>'Fachgebiet',
+            'status'=>'published','user_id'=>(string)$account['id'],
+        ]);
+    }
+
+    public function testReferentCalendarRejectsUnknownAccountLink(): void
+    {
+        $this->expectException(\DomainException::class);
+        $this->c->content->saveReferent($this->admin(),[
+            'slug'=>'ohne-konto','name'=>'Ohne','headline'=>'Schwerpunkt','biography'=>'Profiltext','expertise'=>'Fachgebiet',
+            'status'=>'draft','user_id'=>'999999',
+        ]);
+    }
+
     /** Meldet ein Konto mit MFA-Pflicht vollständig an. */
     private function loginWithMfa(string $email,string $role): void
     {

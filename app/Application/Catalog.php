@@ -58,6 +58,7 @@ final class Catalog
         // Die Textspalte corps bleibt für Altdaten erhalten und wird aus den Mitgliedschaften abgeleitet.
         $data['corps']=$data['corps_memberships']===[]?self::text($values,'corps',250,false):implode(' · ',$data['corps_memberships']);
         $data['career']=self::bullets($values,'career',12);
+        $data['user_id']=self::link($values['user_id']??'');
         $data['expertise']=self::lines($values,'expertise'); $data['status']=self::status($values);
         $data['linkedin_url']=self::linkedin($values['linkedin_url']??'');
         $data['image_path']=self::mediaPath($values['image_path']??'');
@@ -69,6 +70,11 @@ final class Catalog
             if ($existingSlug!==null && $existing===null) { throw new \DomainException('Profil nicht gefunden.'); }
             $duplicate=$this->store->referent($data['slug'],false);
             if ($duplicate!==null && ($existing===null || $duplicate['id']!==$existing['id'])) { throw new \DomainException('Diese Seitenadresse ist bereits vergeben.'); }
+            if ($data['user_id']!==null) {
+                if ($this->db->one('SELECT id FROM users WHERE id=?',[$data['user_id']])===null) { throw new \DomainException('Das gewählte Konto ist nicht vorhanden.'); }
+                $taken=$this->db->one('SELECT id FROM referent_profiles WHERE user_id=?',[$data['user_id']]);
+                if ($taken!==null && ($existing===null || (int)$taken['id']!==(int)$existing['id'])) { throw new \DomainException('Dieses Konto ist bereits mit einem Referentenprofil verknüpft.'); }
+            }
             $this->store->saveReferent($data,$existing,$this->clock->now()->getTimestamp());
             $this->audit->record('content.referent_saved',$actor,$data['slug'],['status'=>$data['status']],'referent');
             return $data['slug'];
@@ -119,6 +125,15 @@ final class Catalog
         if (count($lines)>$max) { throw new \DomainException('Bitte höchstens '.$max.' Stichpunkte eintragen.'); }
         foreach ($lines as $line) { if (mb_strlen($line)>250) { throw new \DomainException('Ein Stichpunkt ist zu lang.'); } }
         return $lines;
+    }
+
+    /** Liest die optionale Kontoverknüpfung; leer bedeutet „kein Konto“. */
+    private static function link(mixed $value): ?int
+    {
+        $value=is_scalar($value)?trim((string)$value):'';
+        if ($value==='') { return null; }
+        if (filter_var($value,FILTER_VALIDATE_INT)===false || (int)$value<1) { throw new \DomainException('Bitte eine gültige Kontoverknüpfung wählen.'); }
+        return (int)$value;
     }
 
     /** Erlaubt ausschließlich vollständige LinkedIn-Profiladressen über HTTPS. */

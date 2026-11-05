@@ -123,6 +123,12 @@ Nach Admin-Anmeldung einschließlich MFA: `/admin/newsletter`.
 
 Einmal freigegebene Texte sind unveränderlich. Die Verwaltung ist auf Adminrollen beschränkt und verwendet die vorhandenen MFA-/CSRF-Prüfungen. Empfängeradressen werden einzeln adressiert, nicht als offener Gruppenverteiler. Newsletter werden als Textmails ohne Öffnungstracking versendet. Es gibt keinen automatischen Import fremder Adresslisten und keine automatische Rundmail ohne Freigabe.
 
+### Referentenkalender
+
+Nach Admin-Anmeldung einschließlich MFA: `/admin/kalender`. Dort stehen offene Terminvorschläge, die Planungslage aller Referenten und je Referent die eingetragenen Zeiträume.
+
+Damit ein Referent selbst planen kann, muss sein Profil mit einem Konto verknüpft sein: **Referenten** → Profil bearbeiten → „Verknüpftes Konto“ wählen und speichern. Das Konto benötigt die Rolle `instructor` (oder höher) und findet den Kalender anschließend unter `/portal/kalender`. Ohne Verknüpfung zeigt das Admin-Formular „kein Konto verknüpft“ und der Referent erhält keinen Zugang. Ein Konto kann nur mit einem Profil verknüpft werden.
+
 ### Cronjobs
 
 Den auf dem Server bestätigten absoluten PHP-Pfad `/usr/local/bin/php` verwenden. Nicht den unvollständig konfigurierten Alt-PHP-Pfad hart verdrahten.
